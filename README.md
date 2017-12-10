@@ -7,6 +7,8 @@ A simple framework to easily make new agents for the Deepmind Lab environment. I
 - Automatic model saving 
 - Automatic creation of experiment plots
 
+See a video of an trained agent here: https://youtu.be/1Q9pBl3YEmo 
+
 ## Acknowledgements
 Thank you to [Google's Deepmind](https://deepmind.com/) for providing their experiment environment to the [public](https://github.com/deepmind/lab). 
 
@@ -124,7 +126,8 @@ The most basic form of a replay memory. Just saves memories in a growing numpy a
 
 ## TODOs
 Please realize, this is a work in progress, so let me know what to improve. The following are already on my list (not sure I can do them all):
-- Generate plots more often
+- Improve plots
+- Generate plots more often (already during training)
 - Add description on how to use custom maps
 - Improve stats for epochs
 - Implement test runs for agents

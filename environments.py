@@ -16,8 +16,8 @@ _logger = logging.getLogger(__name__)
 class Environment(object):
 
     ACTIONS = OrderedDict([
-        ('look_left', np.array((-25, 0, 0, 0, 0, 0, 0), dtype=np.intc)),  # min/max: -512/0
-        ('look_right', np.array((25, 0, 0, 0, 0, 0, 0), dtype=np.intc)),  # min/max: 0/512
+        ('look_left', np.array((-16, 0, 0, 0, 0, 0, 0), dtype=np.intc)),  # min/max: -512/0
+        ('look_right', np.array((16, 0, 0, 0, 0, 0, 0), dtype=np.intc)),  # min/max: 0/512
         ('look_up', np.array((0, 10, 0, 0, 0, 0, 0), dtype=np.intc)),  # min/max: 0/512
         ('look_down', np.array((0, -10, 0, 0, 0, 0, 0), dtype=np.intc)),  # min/max: -512/0
         ('strafe_left', np.array((0, 0, -1, 0, 0, 0, 0), dtype=np.intc)),  # min/max: -1/0

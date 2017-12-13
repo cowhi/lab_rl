@@ -34,18 +34,18 @@ class Experiment(object):
 
         # Initialize environment
         if self.args.env == 'LabLimitedActions':
-            from cowhi.environments import LabLimitedActions
+            from lab_rl.environments import LabLimitedActions
             self.env = LabLimitedActions(self.args, self.rng)
         elif self.args.env == 'LabAllActions':
-            from cowhi.environments import LabAllActions
+            from lab_rl.environments import LabAllActions
             self.env = LabAllActions(self.args, self.rng)
 
         # Initialize agent
         if self.args.agent == 'SimpleDQNAgent':
-            from cowhi.agents import SimpleDQNAgent
+            from lab_rl.agents import SimpleDQNAgent
             self.agent = SimpleDQNAgent(self.args, self.rng, self.env, self.paths)
         elif self.args.agent == 'DiscretizedRandomAgent':
-            from cowhi.agents import DiscretizedRandomAgent
+            from lab_rl.agents import DiscretizedRandomAgent
             self.agent = DiscretizedRandomAgent(self.args, self.rng, self.env, self.paths)
 
     def run(self):

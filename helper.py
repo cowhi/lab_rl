@@ -5,6 +5,7 @@ from __future__ import print_function
 import errno
 import logging
 import os
+import random
 import scipy.stats
 import shutil
 import sys
@@ -83,6 +84,7 @@ def print_stats(step, step_num, train_scores, elapsed_time):
     steps_per_s = 1.0 * step / elapsed_time
     steps_per_m = 60.0 * step / elapsed_time
     steps_per_h = 3600.0 * step / elapsed_time
+
     steps_remain = step_num - step
     remain_h = int(steps_remain / steps_per_h)
     remain_m = int((steps_remain - remain_h * steps_per_h) / steps_per_m)
@@ -123,17 +125,17 @@ def calculate_stats(my_list, confidence=0.95):
     return array_mean, array_ste, array_std, conf_lower, conf_upper
 
 
-def plot_experiment(path_to_dir, file_name):
+def plot_experiment(path_to_dir, file_name, search):
     df = pd.read_csv(os.path.join(path_to_dir, file_name + '.csv'))
     # print(df)
     for column in df.columns:
         plt.figure(figsize=(10, 4), dpi=80)
-        plt.plot(df['episode'], df[column],
+        plt.plot(df[search], df[column],
                  label=column, color='blue', linewidth=2.0)
         plt.ylabel(column, fontsize=20, fontweight='bold')
-        plt.xlabel('episodes', fontsize=20, fontweight='bold')
+        plt.xlabel(search, fontsize=20, fontweight='bold')
         plt.legend()
-        plt.savefig(os.path.join(path_to_dir, 'plots', 'plot_' + str(column) + '.png'),
+        plt.savefig(os.path.join(path_to_dir, 'plots', str(file_name) + '_' + str(column) + '.png'),
                     bbox_inches='tight')
         plt.close('all')
 
@@ -145,6 +147,19 @@ def get_human_readable(size, precision=2):
         suffix_index += 1  # increment the index of the suffix
         size = size/1024.0  # apply the division
     return "%.*f%s" % (precision, size, suffixes[suffix_index])
+
+
+def argmax_tiebreaker(values):
+    """ Gets a random index from all available indices with max value. """
+    return random.choice(np.nonzero(values == np.amax(values))[0])
+
+
+def get_softmax(values, tau=1.0):
+    """ Return softmax of the given values. """
+    e = np.exp(np.array(values) / tau)
+    softmax = e / np.sum(e)
+    # workaround for numpy "sum not 1"-error = normalizing
+    return softmax[0] / sum(softmax[0])
 
 
 def write_stats_file(path_to_file, *args):

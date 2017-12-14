@@ -44,19 +44,20 @@ class Experiment(object):
         if self.args.agent == 'SimpleDQNAgent':
             from lab_rl.agents import SimpleDQNAgent
             self.agent = SimpleDQNAgent(self.args, self.rng, self.env, self.paths)
-        elif self.args.agent == 'DiscretizedRandomAgent':
-            from lab_rl.agents import DiscretizedRandomAgent
-            self.agent = DiscretizedRandomAgent(self.args, self.rng, self.env, self.paths)
+        elif self.args.agent == 'RandomAgent':
+            from lab_rl.agents import RandomAgent
+            self.agent = RandomAgent(self.args, self.rng, self.env, self.paths)
 
     def run(self):
         """ Organizes the training of the agent. """
 
         if not self.args.play:
             # Test and backup untrained agent
-            self.agent.play()
+            # self.agent.test()
             # Train the agent
             self.agent.train()
+            # Test and backup final agent (overrides last backups)
+            # self.agent.test(self.args.test_episodes)
+        else:
+            self.agent.test(1)
 
-        # Test and backup final agent
-        # TODO overrides last epoch
-        self.agent.play()

@@ -41,6 +41,21 @@ Basically all system software should be installed already, so just clone the rep
 ```
 git clone git@github.com:cowhi/lab_rl.git
 ```
+- Very important! Modify the original BUILD instructions by adding the following to the end of the file:
+```
+py_binary(
+    name = "launcher",
+    srcs = ["lab_rl/launcher.py",
+            "lab_rl/agents.py",
+            "lab_rl/environments.py",
+            "lab_rl/experiments.py",
+            "lab_rl/models.py",
+            "lab_rl/helper.py",
+            "lab_rl/replaymemories.py"],
+    data = [":deepmind_lab.so"],
+    main = "lab_rl/launcher.py",
+    )
+```
 
 ### Prepare Python environment
 
@@ -74,8 +89,9 @@ bazel run :launcher -- --save_video=True
 ## Logging
 The launcher generates a logging path for every experiment at `~/.lab/$DATE$_$TIME$_$MAP$_$AGENT$/` containing the following:
 - `args_dump.txt` - All experiment parameters in alphabetical order are saved here
-- `epsiode_stats.csv` - Logs all information about every training episode
 - `experiment.log` - Logfile to see the progress of the environment with information about the training progress
+- `stats_test.csv` - Logs all information about tests (every epoch)
+- `stats_train.csv` - Logs all information about every training episode
 - `models/` - Path were all the models are saved during training after every epoch
 - `plots/` - Path to the plots generated during training to see the development of important experiment parameters
 - `videos/` - Path to the videos generated during training (if set with `--save_video=True`) after every epoch

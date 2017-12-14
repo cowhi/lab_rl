@@ -32,7 +32,7 @@ def parse_args():
                                  help='If this is set the agent only runs some test steps.')
     experiment_args.add_argument('--backup_frequency', type=float, default=0.01,
                                  help='Frequency of model backups: backup_frequency * steps.')
-    experiment_args.add_argument("--random_seed", type=int, default=666,
+    experiment_args.add_argument("--random_seed", type=int, default=123,
                                  help="Random seed for reproducible experiments.")
 
     environment_args = parser.add_argument_group('Environment')
@@ -58,12 +58,16 @@ def parse_args():
                             help='The agent we want to use for training.')
     agent_args.add_argument('--frame_repeat', type=int, default=10,
                             help='The number of frames where an action is repeated.')
+    agent_args.add_argument('--test_episodes', type=int, default=10,
+                            help='The number of test episodes for evaluation.')
     agent_args.add_argument('--epsilon_start', type=float, default=1.0,
                             help='Exploration rate (epsilon) at the beginning of training.')
-    agent_args.add_argument('--epsilon_decay', type=int, default=0.7,
+    agent_args.add_argument('--epsilon_decay', type=float, default=0.7,
                             help='Percentage of all steps from starting epsilon to minimum epsilon.')
     agent_args.add_argument('--epsilon_min', type=float, default=0.01,
                             help='Minimum value of exploration rate (epsilon) during training.')
+    agent_args.add_argument('--tau', type=float, default=10.0,
+                            help='Temperature parameter (tau) for the softmax weighting.')
 
     model_args = parser.add_argument_group('Model')
     model_args.add_argument('--model', type=str, default='SimpleDQNModel',
@@ -104,21 +108,23 @@ def main():
     # get commandline arguments
     args = parse_args()
 
-    # define and create log path
-    new_dir = "%s_%s_%s" % (
-        str(time.strftime("%Y-%m-%d_%H-%M")),
-        str(args.map.lower()),
-        str(args.agent.lower()))
-    path_to_dir = os.path.join(os.path.expanduser("~"), ".lab", new_dir)
-    paths = make_path_structure(path_to_dir)
+    paths = {}
+    if not args.play:
+        # define and create log path
+        new_dir = "%s_%s_%s" % (
+            str(time.strftime("%Y-%m-%d_%H-%M")),
+            str(args.map.lower()),
+            str(args.agent.lower()))
+        path_to_dir = os.path.join(os.path.expanduser("~"), ".lab", new_dir)
+        paths = make_path_structure(path_to_dir)
 
-    # save arguments as a text file
-    dump_args(paths['log_path'], args)
+        # save arguments as a text file
+        dump_args(paths['log_path'], args)
 
-    # Initialize and start logger
-    prepare_logger(paths['log_path'], args.log_level)
-    _logger = logging.getLogger(__name__)
-    _logger.info("Start")
+        # Initialize and start logger
+        prepare_logger(paths['log_path'], args.log_level)
+        _logger = logging.getLogger(__name__)
+        _logger.info("Start")
 
     # Initialize and start experiment
     experiment = Experiment(args, paths)
@@ -126,9 +132,9 @@ def main():
 
     # Plot experiment
     if not args.play:
-        plot_experiment(paths['log_path'], 'episode_stats')
-
-    _logger.info("Finished")
+        plot_experiment(paths['log_path'], 'stats_train', 'episode')
+        plot_experiment(paths['log_path'], 'stats_test', 'epoch')
+        _logger.info("Finished")
 
 
 if __name__ == "__main__" and __package__ is None:

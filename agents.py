@@ -14,10 +14,13 @@ from six.moves import range
 
 from lab_rl.models import SimpleDQNModel
 from lab_rl.replaymemories import SimpleReplayMemory
-from lab_rl.helper import get_human_readable, print_stats
+from lab_rl.helper import get_human_readable, get_softmax, print_stats
 
 import logging
 _logger = logging.getLogger(__name__)
+
+# Ignore all numpy warnings during training
+np.seterr(all='ignore')
 
 
 class Agent(object):
@@ -42,20 +45,15 @@ class Agent(object):
         self.step_episode = 0  # steps per episode
         self.total_reward = 0  # total reward so far
 
-        # Prepare episode logs
-        self.csv_file = None
-        self.csv_writer = None
+        # Prepare training logs (written after every episode)
+        self.csv_train_file = None
+        self.csv_train_writer = None
+        self.prepare_csv_train()
 
-        first_row = ('episode',
-                     'time',
-                     'duration',
-                     'steps_total',
-                     'steps',
-                     'reward_total',
-                     'reward',
-                     'epsilon',
-                     'loss')
-        self.write_csv_init('episode_stats', first_row)
+        # Prepare testing logs (written after every epoch)
+        self.csv_test_file = None
+        self.csv_test_writer = None
+        self.prepare_csv_test()
 
         self.observation = None
         self.model = None
@@ -66,16 +64,42 @@ class Agent(object):
         self.session = None
         self.saver = None
         self.start_time = time.time()
-        self.episode_start_time = None
+        self.episode_start_time = self.start_time
+        self.epoch_start_time = self.start_time
 
-    def write_csv_init(self, target, row):
-        self.csv_file = open(os.path.join(self.paths['log_path'], target + '.csv'), "wb")
-        self.csv_writer = csv.writer(self.csv_file)
-        self.write_csv(row)
+    def prepare_csv_train(self):
+        first_row = ('episode',
+                     'time',
+                     'duration',
+                     'steps_total',
+                     'steps',
+                     'reward_total',
+                     'reward',
+                     'epsilon',
+                     'loss')
+        self.csv_train_file = open(os.path.join(self.paths['log_path'], 'stats_train.csv'), "wb")
+        self.csv_train_writer = csv.writer(self.csv_train_file)
+        self.csv_write_train(first_row)
 
-    def write_csv(self, row):
-        self.csv_writer.writerow(row)
-        self.csv_file.flush()
+    def csv_write_train(self, row):
+        self.csv_train_writer.writerow(row)
+        self.csv_train_file.flush()
+
+    def prepare_csv_test(self):
+        first_row = ('epoch',
+                     'time',
+                     'duration',
+                     'steps',
+                     'episodes',
+                     'reward_avg',
+                     'steps_avg')
+        self.csv_test_file = open(os.path.join(self.paths['log_path'], 'stats_test.csv'), "wb")
+        self.csv_test_writer = csv.writer(self.csv_test_file)
+        self.csv_write_test(first_row)
+
+    def csv_write_test(self, row):
+        self.csv_test_writer.writerow(row)
+        self.csv_test_file.flush()
 
     def preprocess_input(self, img):
         if self.args.color_channels == 1:
@@ -115,11 +139,12 @@ class Agent(object):
                    "{0:.4f}".format(self.epsilon),  # current epsilon
                    "{0:.4f}".format(self.loss)  # avg loss per episode
                    )
-        self.write_csv(new_row)
+        self.csv_write_train(new_row)
 
     def epoch_reset(self):
         self.epoch += 1
         self.epoch_rewards = []
+        self.epoch_start_time = time.time()
 
     def epoch_cleanup(self):
         self.model_name = "DQN_{:04}".format(
@@ -128,25 +153,46 @@ class Agent(object):
         self.saver.save(self.session, self.model_last)
         _logger.info("Saved network after epoch %i (%i steps): %s" %
                      (self.epoch, self.step_current, self.model_name))
-        print_stats(self.step_current,
-                    self.args.steps,
-                    self.epoch_rewards,
-                    time.time() - self.start_time)
-        # TODO do testrun and save stats (epoch, steps, episodes, test_reward_avg, test_step_avg)
-        if self.args.save_video:
-            self.play()
+        if self.step_current > 0:
+            print_stats(self.step_current,
+                        self.args.steps,
+                        self.epoch_rewards,
+                        time.time() - self.start_time)
+        test_reward, test_steps = self.test(self.args.test_episodes)
+        new_row = (self.episode,  # current epoch
+                   "{0:.1f}".format(time.time() - self.start_time),  # total time
+                   "{0:.1f}".format(time.time() - self.epoch_start_time),  # epoch duration
+                   self.step_current,  # total steps so far
+                   self.epoch,  # total episodes so far
+                   "{0:.4f}".format(test_reward),  # avg reward per episode during testing
+                   "{0:.4f}".format(test_steps)  # avg steps per episode during testing
+                   )
+        self.csv_write_test(new_row)
 
-    def play(self):
-        print("Starting playing.")
+    def test(self, episodes):
+        print('TESTING')
+        episode_rewards = []
+        episode_steps = []
+        save_video = False
+        for episode in range(0, episodes):
+            if episode == 0 and self.args.save_video:
+                save_video = True
+            reward, steps = self.play(save_video)
+            episode_rewards.append(reward)
+            episode_steps.append(steps)
+        return sum(episode_rewards)/episodes, sum(episode_steps)/episodes
+
+    def play(self, save_video):
+        print("TEST EPISODE")
         out_video = None
         video_path = None
-        if self.args.save_video:
+        if save_video:
             fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')
             video_path = os.path.join(
                 self.paths['video_path'],
                 "video_" + self.model_name + ".avi")
             out_video = cv2.VideoWriter(video_path, fourcc, self.args.fps, (self.args.width, self.args.height))
-
+        steps_total = 0
         reward_total = 0
         num_episodes = 1
         self.env.reset()
@@ -154,25 +200,23 @@ class Agent(object):
             if not self.env.is_running():
                 self.env.reset()
                 print("Total reward: {}".format(reward_total))
-                reward_total = 0
-                num_episodes -= 1
-
+                return reward_total, steps_total
+            steps_total += 1
             state_raw = self.env.get_observation()
             state = self.preprocess_input(state_raw)
             action = self.get_action(state, 0.05)
-
             for _ in range(self.args.frame_repeat):
                 if self.args.show:
                     cv2.imshow("frame-test", state_raw)
                     cv2.waitKey(20)
-                if self.args.save_video:
+                if save_video:
                     out_video.write(state_raw.astype('uint8'))
                 reward = self.env.step(action, 1)
                 reward_total += reward
                 if not self.env.is_running():
                     break
                 state_raw = self.env.get_observation()
-        if self.args.save_video:
+        if save_video:
             out_video.release()
             print("Saved video (fps:%i, size:%s) to: %s [%s]" %
                   (self.args.fps, str((self.args.width, self.args.height)),
@@ -235,22 +279,27 @@ class SimpleDQNAgent(Agent):
             return self.args.epsilon_min
         else:
             return self.args.epsilon_start - \
-                  steps * (self.args.epsilon_start - self.args.epsilon_min) / \
+                   steps * (self.args.epsilon_start - self.args.epsilon_min) / \
                    (self.args.epsilon_decay * self.args.steps)
 
     def get_action(self, state, epsilon):
+        """ Returns either a random action or an action selected through softmax. """
+        # TODO maybe use tau for exploration control only
         if self.rng.rand() <= epsilon:
             return self.rng.randint(0, self.available_actions)
         else:
-            # TODO add ability to work with q values
-            return self.model.get_action(state)
+            #qs = self.model.get_qs(state)
+            # probs = get_softmax(self.model.get_qs(state), self.args.tau)
+            return self.rng.choice(self.available_actions,
+                                   p=get_softmax(self.model.get_qs(state),
+                                                 self.args.tau))
 
     def train(self):
-        print("Starting training.")
+        self.epoch_cleanup()
         self.epoch_reset()
         self.episode_reset()
+        print("TRAINING")
         for self.step_current in range(1, self.args.steps+1):
-            # self.step_current = step
             self.step_episode += 1
             self.epsilon = self.update_epsilon(self.step_current)
             s, a, r, is_terminal = self.step()
@@ -263,14 +312,15 @@ class SimpleDQNAgent(Agent):
             if self.step_current % (self.args.backup_frequency * self.args.steps) == 0:
                 self.epoch_cleanup()
                 self.epoch_reset()
+                print("TRAINING")
 
 
-class DiscretizedRandomAgent(Agent):
+class RandomAgent(Agent):
     """Simple random agent for DeepMind Lab."""
 
-    def __init__(self, args, env, rng, paths):
+    def __init__(self, args, rng, env, paths):
         # Call super class
-        super(DiscretizedRandomAgent, self).__init__(args, rng, env, paths)
+        super(RandomAgent, self).__init__(args, rng, env, paths)
         print('Starting random discretized agent.')
 
     def get_action(self, *args):

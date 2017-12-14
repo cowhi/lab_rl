@@ -76,6 +76,8 @@ class SimpleDQNModel(TensorflowModel):
     def get_qs(self, state):
         """ Returns the Q values for all available outputs. """
         state = state.astype(np.float32)
+        if len(state.shape) == 3:
+            state = state.reshape([1] + list(self.input_shape))
         return self.session.run(self.q,
                                 feed_dict={self.s_: state})
 
@@ -88,6 +90,8 @@ class SimpleDQNModel(TensorflowModel):
     def get_action(self, state):
         """ Returns the index from the maximal Q value """
         state = state.astype(np.float32)
+        print('Shape original', len(state.shape))
         state = state.reshape([1] + list(self.input_shape))
+        print('Shape altered', len(state.shape))
         return self.session.run(self.action,
                                 feed_dict={self.s_: state})[0]

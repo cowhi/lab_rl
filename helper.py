@@ -156,10 +156,11 @@ def argmax_tiebreaker(values):
 
 def get_softmax(values, tau=1.0):
     """ Return softmax of the given values. """
-    e = np.exp(np.array(values) / tau)
+    e = np.exp(np.array(values[0]) / tau)
     softmax = e / np.sum(e)
+    # print(values[0], softmax)
     # workaround for numpy "sum not 1"-error = normalizing
-    return softmax[0] / sum(softmax[0])
+    return softmax / sum(softmax)
 
 
 def write_stats_file(path_to_file, *args):

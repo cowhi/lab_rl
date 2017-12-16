@@ -16,8 +16,8 @@ _logger = logging.getLogger(__name__)
 class Environment(object):
 
     ACTIONS = OrderedDict([
-        ('look_left', np.array((-16, 0, 0, 0, 0, 0, 0), dtype=np.intc)),  # min/max: -512/0
-        ('look_right', np.array((16, 0, 0, 0, 0, 0, 0), dtype=np.intc)),  # min/max: 0/512
+        ('look_left', np.array((-32, 0, 0, 0, 0, 0, 0), dtype=np.intc)),  # min/max: -512/0
+        ('look_right', np.array((32, 0, 0, 0, 0, 0, 0), dtype=np.intc)),  # min/max: 0/512
         ('look_up', np.array((0, 10, 0, 0, 0, 0, 0), dtype=np.intc)),  # min/max: 0/512
         ('look_down', np.array((0, -10, 0, 0, 0, 0, 0), dtype=np.intc)),  # min/max: -512/0
         ('strafe_left', np.array((0, 0, -1, 0, 0, 0, 0), dtype=np.intc)),  # min/max: -1/0
@@ -73,10 +73,6 @@ class Environment(object):
         return self.env.step(self.map_action(action),
                              num_steps=num_steps)
 
-    # def _map_actions(self, *args):
-    #    """ Individual map per environment """
-    #    pass
-
     @staticmethod
     def get_action_mapping():
         action_mapping = {
@@ -100,24 +96,6 @@ class LabAllActions(Environment):
         super(LabAllActions, self).__init__(args, rng)
         self.action_mapping = self.get_action_mapping()
         self.actions = self.get_actions()
-
-    """
-    @staticmethod
-    def get_action_mapping():
-        action_mapping = {
-            0: 'look_left',
-            1: 'look_right',
-            2: 'look_up',
-            3: 'look_down',
-            4: 'strafe_left',
-            5: 'strafe_right',
-            6: 'forward',
-            7: 'backward',
-            8: 'fire',
-            9: 'jump',
-            10: 'crouch'}
-        return action_mapping
-    """
 
 
 class LabLimitedActions(Environment):

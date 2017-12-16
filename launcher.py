@@ -66,7 +66,11 @@ def parse_args():
                             help='Percentage of all steps from starting epsilon to minimum epsilon.')
     agent_args.add_argument('--epsilon_min', type=float, default=0.01,
                             help='Minimum value of exploration rate (epsilon) during training.')
-    agent_args.add_argument('--tau', type=float, default=10.0,
+    agent_args.add_argument('--tau_start', type=float, default=100.0,
+                            help='Temperature parameter (tau) for the softmax weighting.')
+    agent_args.add_argument('--tau_decay', type=float, default=1.0,
+                            help='Temperature parameter (tau) for the softmax weighting.')
+    agent_args.add_argument('--tau_min', type=float, default=0.1,
                             help='Temperature parameter (tau) for the softmax weighting.')
 
     model_args = parser.add_argument_group('Model')
@@ -76,13 +80,13 @@ def parse_args():
                             help='The path to a model to load for the agent.')
     model_args.add_argument('--alpha', type=float, default=0.00025,
                             help='The learning rate (alpha) of the model.')
-    model_args.add_argument('--gamma', type=float, default=0.99,
+    model_args.add_argument('--gamma', type=float, default=0.9,
                             help='The discount factor (gamma) of the model.')
     model_args.add_argument('--input_width', type=int, default=40,
                             help='Horizontal size of the input images for the network.')
     model_args.add_argument('--input_height', type=int, default=40,
                             help='Vertical size of the input images for the network.')
-    model_args.add_argument('--batch_size', type=int, default=64,
+    model_args.add_argument('--batch_size', type=int, default=32,
                             help='Batch size during network training.')
 
     memory_args = parser.add_argument_group('Memory')

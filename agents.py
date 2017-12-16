@@ -36,6 +36,8 @@ class Agent(object):
         self.epoch_rewards = []
         self.available_actions = self.env.count_actions()
         self.epsilon = self.args.epsilon_start
+        self.tau = self.args.tau_start
+        self.tau_diff = 0.0
         self.loss = 0
 
         self.epoch = 0  # epoch counter
@@ -66,6 +68,7 @@ class Agent(object):
         self.start_time = time.time()
         self.episode_start_time = self.start_time
         self.epoch_start_time = self.start_time
+        self.batch_size = self.args.batch_size
 
     def prepare_csv_train(self):
         first_row = ('episode',
@@ -75,8 +78,9 @@ class Agent(object):
                      'steps',
                      'reward_total',
                      'reward',
-                     'epsilon',
-                     'loss')
+                     'tau',
+                     'loss',
+                     'batch_size')
         self.csv_train_file = open(os.path.join(self.paths['log_path'], 'stats_train.csv'), "wb")
         self.csv_train_writer = csv.writer(self.csv_train_file)
         self.csv_write_train(first_row)
@@ -112,7 +116,7 @@ class Agent(object):
 
     def step(self):
         s = self.preprocess_input(self.env.get_observation())
-        a = self.get_action(s, self.epsilon)
+        a = self.get_action(s, self.tau)
         r = self.env.step(a)
         is_terminal = not self.env.is_running()
         return s, a, r, is_terminal
@@ -136,8 +140,9 @@ class Agent(object):
                    self.step_episode,  # steps per episode
                    self.total_reward,  # total reward so far
                    self.episode_reward,  # reward per episode
-                   "{0:.4f}".format(self.epsilon),  # current epsilon
-                   "{0:.4f}".format(self.loss)  # avg loss per episode
+                   "{0:.4f}".format(self.tau),  # current tau
+                   "{0:.4f}".format(self.loss),  # avg loss per tau
+                   self.batch_size  # current batch size used for training
                    )
         self.csv_write_train(new_row)
 
@@ -158,6 +163,7 @@ class Agent(object):
                         self.args.steps,
                         self.epoch_rewards,
                         time.time() - self.start_time)
+
         test_reward, test_steps = self.test(self.args.test_episodes)
         new_row = (self.episode,  # current epoch
                    "{0:.1f}".format(time.time() - self.start_time),  # total time
@@ -183,7 +189,6 @@ class Agent(object):
         return sum(episode_rewards)/episodes, sum(episode_steps)/episodes
 
     def play(self, save_video):
-        print("TEST EPISODE")
         out_video = None
         video_path = None
         if save_video:
@@ -198,13 +203,11 @@ class Agent(object):
         self.env.reset()
         while num_episodes != 0:
             if not self.env.is_running():
-                self.env.reset()
-                print("Total reward: {}".format(reward_total))
                 return reward_total, steps_total
             steps_total += 1
             state_raw = self.env.get_observation()
             state = self.preprocess_input(state_raw)
-            action = self.get_action(state, 0.05)
+            action = self.get_action(state, self.args.tau_min)  # epsilon = 0.05, tau = 1
             for _ in range(self.args.frame_repeat):
                 if self.args.show:
                     cv2.imshow("frame-test", state_raw)
@@ -265,43 +268,50 @@ class SimpleDQNAgent(Agent):
 
     def train_model(self):
         # train model with random batch from memory
-        if self.memory.size > 2 * self.args.batch_size:
+        if self.step_current % int((1/5)*self.args.steps) == 0:
+            self.batch_size *= 2
+        if self.memory.size > 2 * self.batch_size:
             s, a, r, s_prime, is_terminal = self.memory.get_batch()
             qs = self.model.get_qs(s)
+            # print('Qs', qs[0])
             max_qs = np.max(self.model.get_qs(s_prime), axis=1)
+            # print('a', a[0], 'r', r[0], 'gamma', self.args.gamma, 'q_s_prime', max_qs[0])
             qs[np.arange(qs.shape[0]), a] = r + (1 - is_terminal) * self.args.gamma * max_qs
+            # print('Qs_updated', qs[0])
             return self.model.train(s, qs)
         return 0.0
 
+    '''
     def update_epsilon(self, steps):
         # Update epsilon if necessary
         if steps > self.args.epsilon_decay * self.args.steps:
             return self.args.epsilon_min
-        else:
-            return self.args.epsilon_start - \
-                   steps * (self.args.epsilon_start - self.args.epsilon_min) / \
-                   (self.args.epsilon_decay * self.args.steps)
+        return self.args.epsilon_start - \
+               steps * (self.args.epsilon_start - self.args.epsilon_min) / \
+               (self.args.epsilon_decay * self.args.steps)
+    '''
 
-    def get_action(self, state, epsilon):
-        """ Returns either a random action or an action selected through softmax. """
-        # TODO maybe use tau for exploration control only
-        if self.rng.rand() <= epsilon:
-            return self.rng.randint(0, self.available_actions)
-        else:
-            #qs = self.model.get_qs(state)
-            # probs = get_softmax(self.model.get_qs(state), self.args.tau)
-            return self.rng.choice(self.available_actions,
-                                   p=get_softmax(self.model.get_qs(state),
-                                                 self.args.tau))
+    def update_tau(self):
+        # Update tau if necessary
+        if self.tau <= self.args.tau_min:
+            return self.args.tau_min
+        return self.tau - self.tau * 0.001
+
+    def get_action(self, state, tau):
+        """ Returns an action selected through softmax. """
+        # print(self.step_current, self.tau, self.batch_size)
+        return self.rng.choice(self.available_actions,
+                               p=get_softmax(self.model.get_qs(state),
+                                             tau))
 
     def train(self):
         self.epoch_cleanup()
         self.epoch_reset()
-        self.episode_reset()
         print("TRAINING")
+        self.episode_reset()
         for self.step_current in range(1, self.args.steps+1):
             self.step_episode += 1
-            self.epsilon = self.update_epsilon(self.step_current)
+            self.tau = self.update_tau()
             s, a, r, is_terminal = self.step()
             self.episode_reward += r
             self.memory.add(s, a, r, is_terminal)
@@ -312,7 +322,9 @@ class SimpleDQNAgent(Agent):
             if self.step_current % (self.args.backup_frequency * self.args.steps) == 0:
                 self.epoch_cleanup()
                 self.epoch_reset()
-                print("TRAINING")
+                if not self.step_current == self.args.steps:
+                    print("TRAINING")
+                    self.episode_reset()
 
 
 class RandomAgent(Agent):

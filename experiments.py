@@ -50,14 +50,9 @@ class Experiment(object):
 
     def run(self):
         """ Organizes the training of the agent. """
-
         if not self.args.play:
-            # Test and backup untrained agent
-            # self.agent.test()
             # Train the agent
             self.agent.train()
-            # Test and backup final agent (overrides last backups)
-            # self.agent.test(self.args.test_episodes)
         else:
             self.agent.test(1)
 

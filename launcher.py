@@ -92,7 +92,7 @@ def parse_args():
     memory_args = parser.add_argument_group('Memory')
     model_args.add_argument('--memory', type=str, default='SimpleReplayMemory',
                             help='The replay memory we want to use for training.')
-    memory_args.add_argument('--memory_size', type=int, default=1000000,
+    memory_args.add_argument('--memory_size', type=int, default=100000,
                              help='Size of the replay memory.')
 
     return parser.parse_args()

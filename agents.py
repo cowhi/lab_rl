@@ -295,7 +295,7 @@ class SimpleDQNAgent(Agent):
         # Update tau if necessary
         if self.tau <= self.args.tau_min:
             return self.args.tau_min
-        return self.tau - self.tau * 0.001
+        return self.tau - self.tau * 0.0001
 
     def get_action(self, state, tau):
         """ Returns an action selected through softmax. """

@@ -1,9 +1,11 @@
 import numpy as np
+import os
 import tensorflow as tf
 
 import logging
 _logger = logging.getLogger(__name__)
 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 class Model(object):
     def __init__(self, args, rng, log_path):

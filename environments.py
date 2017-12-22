@@ -42,11 +42,15 @@ class Environment(object):
                 "width": str(self.args.width),
                 "height": str(self.args.height)
             })
+
         self.action_mapping = None
         self.actions = None
 
     def reset(self):
         self.env.reset()
+
+    def close(self):
+        self.env.close()
 
     def get_actions(self):
         actions = OrderedDict()

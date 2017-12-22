@@ -35,6 +35,7 @@ def parse_args():
     experiment_args.add_argument("--random_seed", type=int, default=123,
                                  help="Random seed for reproducible experiments.")
 
+
     environment_args = parser.add_argument_group('Environment')
     environment_args.add_argument('--env', type=str, default='LabLimitedActions',
                                   help='The environment class that we want to use.')
@@ -112,7 +113,11 @@ def main():
     # get commandline arguments
     args = parse_args()
 
-    paths = {}
+    paths = {
+        'log_path': None,
+        'model_path': None,
+        'video_path': None,
+        'plot_path': None}
     if not args.play:
         # define and create log path
         new_dir = "%s_%s_%s" % (

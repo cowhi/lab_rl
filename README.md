@@ -56,6 +56,8 @@ py_binary(
     main = "lab_rl/launcher.py",
     )
 ```
+- To run the maps we are using you can copy the whole **./lab_rl/lab_rl/** folder containing the lua files to the Lab environment located in **./assets/game_scripts/**. Then you can move the **.map**-files into the map folder **./assets/maps/**. That should be it.
+
 
 ### Prepare Python environment
 
@@ -75,7 +77,7 @@ conda install -c menpo opencv3
 
 ## Running experiments
 Run all commands from the **./lab/** path, not **./lab/lab_rl/**
-- First you can try to see if you can load a simple agent, have it set up the logging structure, have it act in the environment for one epsisode, and display it as a video
+- First you can try to see if you can load a simple agent, have it set up the logging structure, have it act in the environment for one episode, and display it as a video
 ```
 bazel run :launcher -- --play=True --show=True
 ```
@@ -118,6 +120,9 @@ All agents are based on the Agent class. This is the most important set of class
 
 ### DiscretizedRandomAgent
 This agent just performs random steps. Use it only to test the environment using the `--play=True` option. Won't train anything.
+
+### DummyAgent
+This agent just performs a single action. Use it only to test the environment using the `--play=True` option. Won't train anything.
 
 ### SimpleDQNAgent
 This agent resembles a very simplified version of the [original DQN](https://sites.google.com/a/deepmind.com/dqn/) implementation, but is sufficient enough to train on simple maps relatively fast and learn to solve given tasks. It is inspired by the [rl_3d](https://github.com/avdmitry/rl_3d) implementation.

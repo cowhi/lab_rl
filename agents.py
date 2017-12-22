@@ -50,12 +50,14 @@ class Agent(object):
         # Prepare training logs (written after every episode)
         self.csv_train_file = None
         self.csv_train_writer = None
-        self.prepare_csv_train()
+        if not self.args.play:
+            self.prepare_csv_train()
 
         # Prepare testing logs (written after every epoch)
         self.csv_test_file = None
         self.csv_test_writer = None
-        self.prepare_csv_test()
+        if not self.args.play:
+            self.prepare_csv_test()
 
         self.observation = None
         self.model = None
@@ -118,7 +120,7 @@ class Agent(object):
         s = self.preprocess_input(self.env.get_observation())
         a = self.get_action(s, self.tau)
         r = self.env.step(a)
-        is_terminal = not self.env.is_running()
+        is_terminal = not self.env.is_running() or r % 2 == 1
         return s, a, r, is_terminal
 
     def episode_reset(self):
@@ -144,7 +146,9 @@ class Agent(object):
                    "{0:.4f}".format(self.loss),  # avg loss per tau
                    self.batch_size  # current batch size used for training
                    )
-        self.csv_write_train(new_row)
+        # print('Train Episode', self.episode, '(steps:', self.step_current,')finished. Reward:', self.episode_reward)
+        if not self.args.play:
+            self.csv_write_train(new_row)
 
     def epoch_reset(self):
         self.epoch += 1
@@ -173,7 +177,8 @@ class Agent(object):
                    "{0:.4f}".format(test_reward),  # avg reward per episode during testing
                    "{0:.4f}".format(test_steps)  # avg steps per episode during testing
                    )
-        self.csv_write_test(new_row)
+        if not self.args.play:
+            self.csv_write_test(new_row)
 
     def test(self, episodes):
         print('TESTING')
@@ -181,6 +186,7 @@ class Agent(object):
         episode_steps = []
         save_video = False
         for episode in range(0, episodes):
+            self.bla = episode
             if episode == 0 and self.args.save_video:
                 save_video = True
             reward, steps = self.play(save_video)
@@ -188,7 +194,7 @@ class Agent(object):
             episode_steps.append(steps)
         return sum(episode_rewards)/episodes, sum(episode_steps)/episodes
 
-    def play(self, save_video):
+    def play(self, save_video, num_episodes=1):
         out_video = None
         video_path = None
         if save_video:
@@ -199,10 +205,12 @@ class Agent(object):
             out_video = cv2.VideoWriter(video_path, fourcc, self.args.fps, (self.args.width, self.args.height))
         steps_total = 0
         reward_total = 0
-        num_episodes = 1
         self.env.reset()
         while num_episodes != 0:
-            if not self.env.is_running():
+            if not self.env.is_running() or reward_total % 2 == 1:
+                # print('Test Episode', self.bla, 'finished. Reward:', reward_total)
+                if reward_total % 2 == 1:
+                    self.env.reset()
                 return reward_total, steps_total
             steps_total += 1
             state_raw = self.env.get_observation()
@@ -216,7 +224,7 @@ class Agent(object):
                     out_video.write(state_raw.astype('uint8'))
                 reward = self.env.step(action, 1)
                 reward_total += reward
-                if not self.env.is_running():
+                if not self.env.is_running() or reward_total % 2 == 1:
                     break
                 state_raw = self.env.get_observation()
         if save_video:
@@ -261,10 +269,11 @@ class SimpleDQNAgent(Agent):
         else:
             init = tf.global_variables_initializer()
             self.session.run(init)
+        if not self.args.play:
         # Backup initial model weights
-        self.model_name = "DQN_0000"
-        self.model_last = os.path.join(self.paths['model_path'], self.model_name)
-        self.saver.save(self.session, self.model_last)
+            self.model_name = "DQN_0000"
+            self.model_last = os.path.join(self.paths['model_path'], self.model_name)
+            self.saver.save(self.session, self.model_last)
 
     def train_model(self):
         # train model with random batch from memory
@@ -316,7 +325,7 @@ class SimpleDQNAgent(Agent):
             self.episode_reward += r
             self.memory.add(s, a, r, is_terminal)
             self.episode_losses.append(self.train_model())
-            if not self.env.is_running():
+            if not self.env.is_running() or is_terminal:
                 self.episode_cleanup()
                 self.episode_reset()
             if self.step_current % (self.args.backup_frequency * self.args.steps) == 0:
@@ -338,6 +347,22 @@ class RandomAgent(Agent):
     def get_action(self, *args):
         """Gets an image state and a reward, returns an action."""
         return self.rng.randint(0, self.available_actions)
+
+    def train(self):
+        pass
+
+
+class DummyAgent(Agent):
+    """Simple dummy agent for DeepMind Lab."""
+
+    def __init__(self, args, rng, env, paths):
+        # Call super class
+        super(DummyAgent, self).__init__(args, rng, env, paths)
+        print('Starting dummy agent.')
+
+    def get_action(self, *args):
+        """Gets an image state and a reward, returns an action."""
+        return 0
 
     def train(self):
         pass

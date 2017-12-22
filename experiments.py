@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import logging
 import time
+import sys
 import numpy as np
 
 _logger = logging.getLogger(__name__)
@@ -47,6 +48,12 @@ class Experiment(object):
         elif self.args.agent == 'RandomAgent':
             from lab_rl.agents import RandomAgent
             self.agent = RandomAgent(self.args, self.rng, self.env, self.paths)
+        elif self.args.agent == 'DummyAgent':
+            from lab_rl.agents import DummyAgent
+            self.agent = DummyAgent(self.args, self.rng, self.env, self.paths)
+        else:
+            print('No agent:', self.args.agent)
+            sys.exit(1)
 
     def run(self):
         """ Organizes the training of the agent. """

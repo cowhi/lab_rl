@@ -49,7 +49,7 @@ def parse_args():
                                   help='Number of frames per second')
     environment_args.add_argument('--runfiles_path', type=str, default=None,
                                   help='Set the runfiles path to find DeepMind Lab data')
-    environment_args.add_argument('--level_script', type=str, default='seekavoid_arena_01',
+    environment_args.add_argument('--level_script', type=str, default='lab_rl/random_spawn',
                                   help='The environment level script to load')
     environment_args.add_argument('--map', type=str, default='square_00',
                                   help='The map on which the agent learns.')

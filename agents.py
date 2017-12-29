@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import csv
 import cv2
+import glob
 import os
 import six
 import time
@@ -46,6 +47,7 @@ class Agent(object):
         self.step_current = 0  # total steps so far
         self.step_episode = 0  # steps per episode
         self.total_reward = 0  # total reward so far
+        self.test_reward_best = 0  # best avg reward after epochs
 
         # Prepare training logs (written after every episode)
         self.csv_train_file = None
@@ -147,7 +149,7 @@ class Agent(object):
                    "{0:.4f}".format(self.loss),  # avg loss per tau
                    self.batch_size  # current batch size used for training
                    )
-        # print('Train Episode', self.episode, '(steps:', self.step_current,')finished. Reward:', self.episode_reward)
+        print('Train Episode', self.episode, '(steps:', self.step_current,')finished. Reward:', self.episode_reward)
         if not self.args.play:
             self.csv_write_train(new_row)
 
@@ -157,12 +159,7 @@ class Agent(object):
         self.epoch_start_time = time.time()
 
     def epoch_cleanup(self):
-        self.model_name = "DQN_{:04}".format(
-            int(self.step_current / (self.args.backup_frequency * self.args.steps)))
-        self.model_last = os.path.join(self.paths['model_path'], self.model_name)
-        self.saver.save(self.session, self.model_last)
-        _logger.info("Saved network after epoch %i (%i steps): %s" %
-                     (self.epoch, self.step_current, self.model_name))
+
         if self.step_current > 0:
             print_stats(self.step_current,
                         self.args.steps,
@@ -178,6 +175,17 @@ class Agent(object):
                    "{0:.4f}".format(test_reward),  # avg reward per episode during testing
                    "{0:.4f}".format(test_steps)  # avg steps per episode during testing
                    )
+        if self.test_reward_best <= test_reward:
+            self.test_reward_best = test_reward
+            # self.model_name = "DQN_{:04}".format(
+            #    int(self.step_current / (self.args.backup_frequency * self.args.steps)))
+            for old in glob.glob(os.path.join(self.paths['model_path'],'DQN_epoch_*')):
+                os.remove(old)
+            self.model_name = 'DQN_epoch_{:04}'.format(self.epoch)
+            self.model_last = os.path.join(self.paths['model_path'], self.model_name)
+            self.saver.save(self.session, self.model_last)
+            _logger.info("Saved network after epoch %i (%i steps): %s" %
+                         (self.epoch, self.step_current, self.model_name))
         if not self.args.play:
             self.csv_write_test(new_row)
 
@@ -217,7 +225,7 @@ class Agent(object):
             steps_total += 1
             state_raw = self.env.get_observation()
             state = self.preprocess_input(state_raw)
-            action = self.get_action(state, self.args.tau_min)  # epsilon = 0.05, tau = 1
+            action = self.get_action(state, self.args.tau_min)  # epsilon = 0.05, tau = 0.1
             for _ in range(self.args.frame_repeat):
                 if self.args.show:
                     cv2.imshow("frame-test", state_raw)

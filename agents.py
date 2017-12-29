@@ -125,6 +125,7 @@ class Agent(object):
 
     def episode_reset(self):
         self.episode += 1
+        #print('Test Episode', self.episode)
         self.episode_reward = 0
         self.step_episode = 0
         self.episode_losses = []
@@ -195,6 +196,7 @@ class Agent(object):
         return sum(episode_rewards)/episodes, sum(episode_steps)/episodes
 
     def play(self, save_video, num_episodes=1):
+        # print('Test Episode', self.bla)
         out_video = None
         video_path = None
         if save_video:
@@ -208,7 +210,7 @@ class Agent(object):
         self.env.reset()
         while num_episodes != 0:
             if not self.env.is_running() or reward_total % 2 == 1:
-                # print('Test Episode', self.bla, 'finished. Reward:', reward_total)
+                # print('Test Episode finished - Reward:', reward_total)
                 if reward_total % 2 == 1:
                     self.env.reset()
                 return reward_total, steps_total
@@ -277,8 +279,8 @@ class SimpleDQNAgent(Agent):
 
     def train_model(self):
         # train model with random batch from memory
-        if self.step_current % int((1/5)*self.args.steps) == 0:
-            self.batch_size *= 2
+        # if self.step_current % int((1/5)*self.args.steps) == 0:
+        #    self.batch_size *= 2
         if self.memory.size > 2 * self.batch_size:
             s, a, r, s_prime, is_terminal = self.memory.get_batch()
             qs = self.model.get_qs(s)

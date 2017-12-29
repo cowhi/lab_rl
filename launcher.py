@@ -20,7 +20,9 @@ def parse_args():
         description="Framework to guide RL in the Deepmind Lab environment")
 
     experiment_args = parser.add_argument_group('Experiment')
-    experiment_args.add_argument('--steps', type=int, default=1000000,
+    experiment_args.add_argument('--runs', type=int, default=1,
+                                 help='Number of runs to perform the experiment.')
+    experiment_args.add_argument('--steps', type=int, default=100000,
                                  help='Number of steps to run the agent')
     experiment_args.add_argument('--log_level', type=str, default='info',
                                  help='The log level for the log file.')
@@ -49,7 +51,7 @@ def parse_args():
                                   help='Set the runfiles path to find DeepMind Lab data')
     environment_args.add_argument('--level_script', type=str, default='seekavoid_arena_01',
                                   help='The environment level script to load')
-    environment_args.add_argument('--map', type=str, default='seekavoid_arena_01',
+    environment_args.add_argument('--map', type=str, default='square_00',
                                   help='The map on which the agent learns.')
     environment_args.add_argument('--color_channels', type=int, default=3,
                                   help='The number of color channels for the environment.')
@@ -69,7 +71,7 @@ def parse_args():
                             help='Minimum value of exploration rate (epsilon) during training.')
     agent_args.add_argument('--tau_start', type=float, default=100.0,
                             help='Temperature parameter (tau) for the softmax weighting.')
-    agent_args.add_argument('--tau_decay', type=float, default=0.00001,
+    agent_args.add_argument('--tau_decay', type=float, default=0.00007,
                             help='Temperature parameter (tau) decay after every step for the softmax weighting.')
     agent_args.add_argument('--tau_min', type=float, default=0.1,
                             help='Temperature parameter (tau) for the softmax weighting.')
@@ -112,38 +114,39 @@ def make_path_structure(path_to_dir):
 def main():
     # get commandline arguments
     args = parse_args()
+    new_dir = "%s_%s_%s" % (
+        str(time.strftime("%Y-%m-%d_%H-%M")),
+        str(args.map.lower()),
+        str(args.agent.lower()))
+    for run in range(args.runs):
+        print('###  RUN {num:02d}  #############################'.format(num=run))
+        paths = {
+            'log_path': None,
+            'model_path': None,
+            'video_path': None,
+            'plot_path': None}
+        if not args.play:
+            # define and create log path
+            path_to_dir = os.path.join(os.path.expanduser("~"), ".lab", new_dir, 'run_{num:02d}'.format(num=run))
+            paths = make_path_structure(path_to_dir)
 
-    paths = {
-        'log_path': None,
-        'model_path': None,
-        'video_path': None,
-        'plot_path': None}
-    if not args.play:
-        # define and create log path
-        new_dir = "%s_%s_%s" % (
-            str(time.strftime("%Y-%m-%d_%H-%M")),
-            str(args.map.lower()),
-            str(args.agent.lower()))
-        path_to_dir = os.path.join(os.path.expanduser("~"), ".lab", new_dir)
-        paths = make_path_structure(path_to_dir)
+            # save arguments as a text file
+            dump_args(paths['log_path'], args)
 
-        # save arguments as a text file
-        dump_args(paths['log_path'], args)
+            # Initialize and start logger
+            prepare_logger(paths['log_path'], args.log_level)
+            _logger = logging.getLogger(__name__)
+            _logger.info("Start")
 
-        # Initialize and start logger
-        prepare_logger(paths['log_path'], args.log_level)
-        _logger = logging.getLogger(__name__)
-        _logger.info("Start")
+        # Initialize and start experiment
+        experiment = Experiment(args, paths)
+        experiment.run()
 
-    # Initialize and start experiment
-    experiment = Experiment(args, paths)
-    experiment.run()
-
-    # Plot experiment
-    if not args.play:
-        plot_experiment(paths['log_path'], 'stats_train', 'episode')
-        plot_experiment(paths['log_path'], 'stats_test', 'epoch')
-        _logger.info("Finished")
+        # Plot experiment
+        if not args.play:
+            plot_experiment(paths['log_path'], 'stats_train', 'episode')
+            plot_experiment(paths['log_path'], 'stats_test', 'epoch')
+            _logger.info("Finished")
 
 
 if __name__ == "__main__" and __package__ is None:

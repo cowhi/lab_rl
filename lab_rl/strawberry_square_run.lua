@@ -5,6 +5,6 @@
 local factory = require 'lab_rl.random_spawn_factory'
 
 return factory.createLevelApi{
-    mapName = 'square_mix',
+    mapName = 'strawberry_square',
     episodeLengthSeconds = 30
 }

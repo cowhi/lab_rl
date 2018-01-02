@@ -52,8 +52,6 @@ def parse_args():
                                   help='Set the runfiles path to find DeepMind Lab data')
     environment_args.add_argument('--level_script', type=str, default='lab_rl/apple_square_run',
                                   help='The environment level script to load')
-    environment_args.add_argument('--map', type=str, default='apple_square',
-                                  help='The map on which the agent learns.')
     environment_args.add_argument('--color_channels', type=int, default=3,
                                   help='The number of color channels for the environment.')
 
@@ -116,11 +114,11 @@ def main():
     # get commandline arguments
     args = parse_args()
     script = os.path.split(args.level_script.lower())
-    map = re.sub('\_run$', '', script[-1])
+    level = re.sub('\_run$', '', script[-1])
 
     new_dir = "%s_%s_%s" % (
         str(time.strftime("%Y-%m-%d_%H-%M")),
-        str(map),
+        str(level),
         str(args.agent.lower()))
     for run in range(args.runs):
         print('###  RUN {num:02d}  #############################'.format(num=run))

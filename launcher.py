@@ -9,7 +9,7 @@ import re
 import time
 
 from lab_rl.experiments import Experiment
-from lab_rl.helper import create_dir, dump_args, prepare_logger, plot_experiment
+from lab_rl.helper import create_dir, dump_args, prepare_logger, plot_experiment, summarize_runs
 
 __author__ = "Ruben Glatt"
 __copyright__ = "Ruben Glatt"
@@ -120,6 +120,12 @@ def main():
         str(time.strftime("%Y-%m-%d_%H-%M")),
         str(level),
         str(args.agent.lower()))
+    # Plot path
+    target_path = create_dir(os.path.join(os.path.expanduser("~"), ".lab", new_dir))
+    plot_path = create_dir(os.path.join(target_path, 'plots'))
+    # save arguments as a text file
+    dump_args(target_path, args)
+
     for run in range(args.runs):
         print('###  RUN {num:02d}  #############################'.format(num=run))
         paths = {
@@ -131,9 +137,6 @@ def main():
             # define and create log path
             path_to_dir = os.path.join(os.path.expanduser("~"), ".lab", new_dir, 'run_{num:02d}'.format(num=run))
             paths = make_path_structure(path_to_dir)
-
-            # save arguments as a text file
-            dump_args(paths['log_path'], args)
 
             # Initialize and start logger
             prepare_logger(paths['log_path'], args.log_level)
@@ -149,6 +152,12 @@ def main():
             plot_experiment(paths['log_path'], 'stats_train', 'episode')
             plot_experiment(paths['log_path'], 'stats_test', 'epoch')
             _logger.info("Finished")
+    # TODO: summarize runs
+    summarize_runs(target_path)
+    # TODO: plot run summary
+    plot_experiment(target_path, 'stats_train', 'episode')
+    plot_experiment(target_path, 'stats_test', 'epoch')
+    # TODO: get best model
 
 
 if __name__ == "__main__" and __package__ is None:

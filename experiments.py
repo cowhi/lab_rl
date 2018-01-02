@@ -62,4 +62,3 @@ class Experiment(object):
             self.agent.train()
         else:
             self.agent.test(1)
-

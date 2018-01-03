@@ -152,9 +152,7 @@ def main():
             plot_experiment(paths['log_path'], 'stats_train', 'episode')
             plot_experiment(paths['log_path'], 'stats_test', 'epoch')
             _logger.info("Finished")
-    # TODO: summarize runs
     summarize_runs(target_path)
-    # TODO: plot run summary
     plot_experiment(target_path, 'stats_train', 'episode')
     plot_experiment(target_path, 'stats_test', 'epoch')
     # TODO: get best model

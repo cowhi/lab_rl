@@ -176,11 +176,11 @@ class Agent(object):
                    "{0:.4f}".format(test_steps)  # avg steps per episode during testing
                    )
         # if self.test_reward_best <= test_reward:
-        self.test_reward_best = test_reward
+        # self.test_reward_best = test_reward
         # self.model_name = "DQN_{:04}".format(
         #    int(self.step_current / (self.args.backup_frequency * self.args.steps)))
-        for old in glob.glob(os.path.join(self.paths['model_path'],'DQN_epoch_*')):
-            os.remove(old)
+        # for old in glob.glob(os.path.join(self.paths['model_path'],'DQN_epoch_*')):
+        #    os.remove(old)
         self.model_name = 'DQN_epoch_{:04}'.format(self.epoch)
         self.model_last = os.path.join(self.paths['model_path'], self.model_name)
         self.saver.save(self.session, self.model_last)

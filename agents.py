@@ -344,7 +344,8 @@ class SimpleDQNAgent(Agent):
                 self.episode_cleanup()
                 self.episode_reset()
             if self.step_current % (self.args.backup_frequency * self.args.steps) == 0:
-                self.episode_cleanup()
+                if self.env.is_running() or not is_terminal:
+                    self.episode_cleanup()
                 self.epoch_cleanup()
                 self.epoch_reset()
                 if not self.step_current == self.args.steps:

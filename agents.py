@@ -127,7 +127,7 @@ class Agent(object):
 
     def episode_reset(self):
         self.episode += 1
-        #print('Test Episode', self.episode)
+        # print('Episode', self.episode, 'START')
         self.episode_reward = 0
         self.step_episode = 0
         self.episode_losses = []
@@ -135,6 +135,7 @@ class Agent(object):
         self.episode_start_time = time.time()
 
     def episode_cleanup(self):
+        # print('Episode', self.episode, 'END')
         self.epoch_rewards.append(self.episode_reward)
         self.total_reward += self.episode_reward
         self.loss = sum(self.episode_losses)/len(self.episode_losses)
@@ -149,7 +150,7 @@ class Agent(object):
                    "{0:.4f}".format(self.loss),  # avg loss per tau
                    self.batch_size  # current batch size used for training
                    )
-        print('Train Episode', self.episode, '(steps:', self.step_current,')finished. Reward:', self.episode_reward)
+        # print('Train Episode', self.episode, '(steps:', self.step_current,')finished. Reward:', self.episode_reward)
         if not self.args.play:
             self.csv_write_train(new_row)
 
@@ -159,33 +160,32 @@ class Agent(object):
         self.epoch_start_time = time.time()
 
     def epoch_cleanup(self):
-
         if self.step_current > 0:
             print_stats(self.step_current,
                         self.args.steps,
                         self.epoch_rewards,
                         time.time() - self.start_time)
-
         test_reward, test_steps = self.test(self.args.test_episodes)
-        new_row = (self.episode,  # current epoch
+
+        new_row = (self.epoch,  # current epoch
                    "{0:.1f}".format(time.time() - self.start_time),  # total time
                    "{0:.1f}".format(time.time() - self.epoch_start_time),  # epoch duration
                    self.step_current,  # total steps so far
-                   self.epoch,  # total episodes so far
+                   self.episode,  # total episodes so far
                    "{0:.4f}".format(test_reward),  # avg reward per episode during testing
                    "{0:.4f}".format(test_steps)  # avg steps per episode during testing
                    )
-        if self.test_reward_best <= test_reward:
-            self.test_reward_best = test_reward
-            # self.model_name = "DQN_{:04}".format(
-            #    int(self.step_current / (self.args.backup_frequency * self.args.steps)))
-            for old in glob.glob(os.path.join(self.paths['model_path'],'DQN_epoch_*')):
-                os.remove(old)
-            self.model_name = 'DQN_epoch_{:04}'.format(self.epoch)
-            self.model_last = os.path.join(self.paths['model_path'], self.model_name)
-            self.saver.save(self.session, self.model_last)
-            _logger.info("Saved network after epoch %i (%i steps): %s" %
-                         (self.epoch, self.step_current, self.model_name))
+        # if self.test_reward_best <= test_reward:
+        # self.test_reward_best = test_reward
+        # self.model_name = "DQN_{:04}".format(
+        #    int(self.step_current / (self.args.backup_frequency * self.args.steps)))
+        # for old in glob.glob(os.path.join(self.paths['model_path'],'DQN_epoch_*')):
+        #    os.remove(old)
+        self.model_name = 'DQN_epoch_{:04}'.format(self.epoch)
+        self.model_last = os.path.join(self.paths['model_path'], self.model_name)
+        self.saver.save(self.session, self.model_last)
+        _logger.info("Saved network after epoch %i (%i steps): %s" %
+                     (self.epoch, self.step_current, self.model_name))
         if not self.args.play:
             self.csv_write_test(new_row)
 
@@ -195,12 +195,17 @@ class Agent(object):
         episode_steps = []
         save_video = False
         for episode in range(0, episodes):
-            self.bla = episode
+            # self.bla = episode
             if episode == 0 and self.args.save_video:
                 save_video = True
+            # print('Test episode %i' % episode)
             reward, steps = self.play(save_video)
             episode_rewards.append(reward)
             episode_steps.append(steps)
+        print_stats(sum(episode_steps),
+                    sum(episode_steps),
+                    episode_rewards,
+                    time.time() - self.start_time)
         return sum(episode_rewards)/episodes, sum(episode_steps)/episodes
 
     def play(self, save_video, num_episodes=1):
@@ -339,6 +344,8 @@ class SimpleDQNAgent(Agent):
                 self.episode_cleanup()
                 self.episode_reset()
             if self.step_current % (self.args.backup_frequency * self.args.steps) == 0:
+                if self.env.is_running() or not is_terminal:
+                    self.episode_cleanup()
                 self.epoch_cleanup()
                 self.epoch_reset()
                 if not self.step_current == self.args.steps:

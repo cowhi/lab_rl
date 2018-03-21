@@ -2,7 +2,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import csv
 import errno
+import glob
 import logging
 import os
 import random
@@ -10,23 +12,28 @@ import scipy.stats
 import shutil
 import sys
 
+import matplotlib
+#matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
+#plt.switch_backend('Qt5Agg')
 import numpy as np
 import pandas as pd
 
 
-def dump_args(log_path, args):
-    _logger = logging.getLogger(__name__)
-    try:
-        args_dump = open(os.path.join(log_path, 'args_dump.txt'), 'w', 0)
-        args_dict = vars(args)
-        for key in sorted(args_dict):
-            args_dump.write("%s=%s\n" % (str(key), str(args_dict[key])))
-        args_dump.flush()
-        args_dump.close()
-    except Exception as e:
-        _logger.critical("Can't dump args - %s" % str(e))
-        sys.exit(1)
+def argmax_tiebreaker(values):
+    """ Gets a random index from all available indices with max value. """
+    return random.choice(np.nonzero(values == np.amax(values))[0])
+
+
+def calculate_stats(my_list, confidence=0.95):
+    """ Returns  statistics about a list. """
+    my_array = 1.0 * np.array(my_list)
+    array_mean = np.mean(my_array)
+    array_ste = scipy.stats.sem(my_array)
+    array_std = my_array.std()
+    conf_lower, conf_upper = scipy.stats.t.interval(confidence, len(my_array) - 1, loc=np.mean(my_array),
+                                                    scale=scipy.stats.sem(my_array))
+    return array_mean, array_ste, array_std, conf_lower, conf_upper
 
 
 def copy_file(src, dest):
@@ -63,6 +70,20 @@ def delete_dir(path_to_dir):
         sys.exit(1)
 
 
+def dump_args(log_path, args):
+    _logger = logging.getLogger(__name__)
+    try:
+        args_dump = open(os.path.join(log_path, 'args_dump.txt'), 'w', 0)
+        args_dict = vars(args)
+        for key in sorted(args_dict):
+            args_dump.write("%s=%s\n" % (str(key), str(args_dict[key])))
+        args_dump.flush()
+        args_dump.close()
+    except Exception as e:
+        _logger.critical("Can't dump args - %s" % str(e))
+        sys.exit(1)
+
+
 def prepare_logger(log_path, log_level):
     # make sure no loggers are already active
     try:
@@ -94,7 +115,7 @@ def print_stats(step, step_num, train_scores, elapsed_time):
     elapsed_s = int((elapsed_time - elapsed_h * 3600 - elapsed_m * 60))
     print("{}% | Steps: {}/{}, {:.2f}M step/h, {:02}:{:02}:{:02}/{:02}:{:02}:{:02}".format(
         100.0 * step / step_num, step, step_num, steps_per_h / 1e6,
-        elapsed_h, elapsed_m, elapsed_s, remain_h, remain_m, remain_s), file=sys.stderr)
+        elapsed_h, elapsed_m, elapsed_s, remain_h, remain_m, remain_s))
     _logger.info("{}% | Steps: {}/{}, {:.2f}M step/h, {:02}:{:02}:{:02}/{:02}:{:02}:{:02}".format(
         100.0 * step / step_num, step, step_num, steps_per_h / 1e6,
         elapsed_h, elapsed_m, elapsed_s, remain_h, remain_m, remain_s))
@@ -109,20 +130,9 @@ def print_stats(step, step_num, train_scores, elapsed_time):
         min_train = train_scores.min()
         max_train = train_scores.max()
     print("Episodes: {} Rewards: mean: {:.2f}, std: {:.2f}, min: {:.2f}, max: {:.2f}".format(
-        len(train_scores), mean_train, std_train, min_train, max_train), file=sys.stderr)
+        len(train_scores), mean_train, std_train, min_train, max_train))
     _logger.info("Episodes: {} Rewards: mean: {:.2f}, std: {:.2f}, min: {:.2f}, max: {:.2f}".format(
         len(train_scores), mean_train, std_train, min_train, max_train))
-
-
-def calculate_stats(my_list, confidence=0.95):
-    """ Returns  statistics about a list. """
-    my_array = 1.0 * np.array(my_list)
-    array_mean = np.mean(my_array)
-    array_ste = scipy.stats.sem(my_array)
-    array_std = my_array.std()
-    conf_lower, conf_upper = scipy.stats.t.interval(confidence, len(my_array) - 1, loc=np.mean(my_array),
-                                                    scale=scipy.stats.sem(my_array))
-    return array_mean, array_ste, array_std, conf_lower, conf_upper
 
 
 def plot_experiment(path_to_dir, file_name, search):
@@ -147,11 +157,6 @@ def get_human_readable(size, precision=2):
         suffix_index += 1  # increment the index of the suffix
         size = size/1024.0  # apply the division
     return "%.*f%s" % (precision, size, suffixes[suffix_index])
-
-
-def argmax_tiebreaker(values):
-    """ Gets a random index from all available indices with max value. """
-    return random.choice(np.nonzero(values == np.amax(values))[0])
 
 
 def get_softmax(values, tau=1.0):
@@ -192,3 +197,49 @@ def write_stats_file(path_to_file, *args):
             # manager means the file will be automatically closed when
             # we're done with it.
             file_obj.write(line)
+
+
+def summarize_runs(path_to_dir):
+    _logger = logging.getLogger(__name__)
+    run_dirs = glob.glob(os.path.join(path_to_dir) + '/run_*/')
+
+    for kind in ['train', 'test']:
+        run_files = [os.path.join(run_dir, 'stats_' + kind + '.csv')
+                     for run_dir in run_dirs]
+        df = pd.concat((pd.read_csv(run_file) for run_file in run_files))
+        if kind == 'train':
+            interval = 'episode'
+            step_term = 'steps'
+            reward_term = 'reward'
+        elif kind == 'test':
+            interval = 'epoch'
+            step_term = 'steps_avg'
+            reward_term = 'reward_avg'
+        else:
+            sys.exit(1)
+        steps = df.groupby(interval)[step_term]
+        steps = list(steps)
+        reward = df.groupby([interval])[reward_term]
+        reward = list(reward)
+        summary = []
+        for episode in range(0, len(reward)):
+            step_mean, _, _, _, _ = \
+                calculate_stats(steps[episode][1])
+            reward_mean, _, _, _, _ = \
+                calculate_stats(reward[episode][1])
+            summary.append([int(steps[episode][0]),
+                            step_mean,
+                            reward_mean])
+        header = [interval, 'steps_mean', 'reward_mean']
+        try:
+            with open(os.path.join(path_to_dir, 'stats_' + kind + '.csv'), 'w') \
+                    as csvfile:
+                writer = csv.writer(csvfile,
+                                    dialect='excel',
+                                    quoting=csv.QUOTE_NONNUMERIC)
+                writer.writerow(header)
+                for data in summary:
+                    writer.writerow(data)
+        except IOError as e:
+            _logger.critical("Can't write stats file - %s " % str(e))
+            sys.exit()

@@ -30,8 +30,8 @@ class Environment(object):
     ])
 
     def __init__(self, args, rng):
-        _logger.info("Initializing Lab (Type: %s, FPS: %i, width: %i, height: %i, map: %s)" %
-                     (args.env, args.fps, args.width, args.height, args.map))
+        _logger.info("Initializing Lab (Type: %s, FPS: %i, width: %i, height: %i, level: %s)" %
+                     (args.env, args.fps, args.width, args.height, args.level_script))
         self.args = args
         self.rng = rng
         self.env = deepmind_lab.Lab(

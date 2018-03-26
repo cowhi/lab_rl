@@ -21,7 +21,7 @@ local map = {}
 --]]
 map.entity = [[
 *************
-*GAAAAAAAAAA*
+*GAAAAA     *
 *P          *
 *           *
 *           *

@@ -34,7 +34,7 @@ class SimpleDQNModel(TensorflowModel):
         self.s_ = tf.placeholder(shape=[None] + list(self.input_shape),
                                  dtype=tf.float32)
         # Build the network
-        self.q = self.build_network()
+        self.q = self.build_network_bigger()
         # Define a placeholder for loss calculation
         self.q_ = tf.placeholder(shape=[None, self.output_shape],
                                  dtype=tf.float32)
@@ -62,6 +62,29 @@ class SimpleDQNModel(TensorflowModel):
                                          stride=[2, 2])
         conv2_flat = tf.contrib.layers.flatten(conv2)
         fc1 = tf.contrib.layers.fully_connected(conv2_flat,
+                                                num_outputs=128)
+        # Create the output layer of the network
+        q = tf.contrib.layers.fully_connected(fc1,
+                                              num_outputs=self.output_shape,
+                                              activation_fn=None)
+        return q
+
+    def build_network_bigger(self):
+        # Create the hidden layers of the network.
+        conv1 = tf.contrib.layers.conv2d(self.s_,
+                                         num_outputs=16,
+                                         kernel_size=[8, 8],
+                                         stride=[4, 4])
+        conv2 = tf.contrib.layers.conv2d(conv1,
+                                         num_outputs=32,
+                                         kernel_size=[4, 4],
+                                         stride=[2, 2])
+        conv3 = tf.contrib.layers.conv2d(conv2,
+                                         num_outputs=32,
+                                         kernel_size=[3, 3],
+                                         stride=[1, 1])
+        conv3_flat = tf.contrib.layers.flatten(conv3)
+        fc1 = tf.contrib.layers.fully_connected(conv3_flat,
                                                 num_outputs=128)
         # Create the output layer of the network
         q = tf.contrib.layers.fully_connected(fc1,

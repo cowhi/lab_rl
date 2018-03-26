@@ -84,9 +84,9 @@ def parse_args():
                             help='The learning rate (alpha) of the model.')
     model_args.add_argument('--gamma', type=float, default=0.9,
                             help='The discount factor (gamma) of the model.')
-    model_args.add_argument('--input_width', type=int, default=40,
+    model_args.add_argument('--input_width', type=int, default=80,
                             help='Horizontal size of the input images for the network.')
-    model_args.add_argument('--input_height', type=int, default=40,
+    model_args.add_argument('--input_height', type=int, default=80,
                             help='Vertical size of the input images for the network.')
     model_args.add_argument('--batch_size', type=int, default=32,
                             help='Batch size during network training.')
@@ -94,7 +94,7 @@ def parse_args():
     memory_args = parser.add_argument_group('Memory')
     model_args.add_argument('--memory', type=str, default='SimpleReplayMemory',
                             help='The replay memory we want to use for training.')
-    memory_args.add_argument('--memory_size', type=int, default=100000,
+    memory_args.add_argument('--memory_size', type=int, default=50000,
                              help='Size of the replay memory.')
 
     return parser.parse_args()

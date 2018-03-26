@@ -58,7 +58,7 @@ def parse_args():
     agent_args = parser.add_argument_group('Agent')
     agent_args.add_argument('--agent', type=str, default='SimpleDQNAgent',
                             help='The agent we want to use for training.')
-    agent_args.add_argument('--frame_repeat', type=int, default=10,
+    agent_args.add_argument('--frame_repeat', type=int, default=4,
                             help='The number of frames where an action is repeated.')
     agent_args.add_argument('--test_episodes', type=int, default=10,
                             help='The number of test episodes for evaluation.')

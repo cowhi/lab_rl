@@ -231,6 +231,7 @@ class Agent(object):
             state_raw = self.env.get_observation()
             state = self.preprocess_input(state_raw)
             action = self.get_action(state, self.args.tau_min)  # epsilon = 0.05, tau = 0.1
+            reward_old = reward_total
             for _ in range(self.args.frame_repeat):
                 if self.args.show:
                     cv2.imshow("frame-test", state_raw)
@@ -239,6 +240,9 @@ class Agent(object):
                     out_video.write(state_raw.astype('uint8'))
                 reward = self.env.step(action, 1)
                 reward_total += reward
+                if reward_total != reward_old:
+                    print("New reward:", reward, 'Sum:', reward_total)
+                    reward_old = reward_total
                 if not self.env.is_running() or reward_total % 2 == 1:
                     break
                 state_raw = self.env.get_observation()

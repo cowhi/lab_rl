@@ -157,6 +157,7 @@ Please realize, this is a work in progress, so let me know what to improve. The 
 - Add support for continuous actions (discrete and continuous envs and agents)
 - Add support for different model frameworks (pytorch!)
 - Possible to use tensorboard??
+- Document Matplotlib issue, change backend to 'Agg' in /home/ruben/anaconda3/envs/lab/lib/python2.7/site-packages/matplotlib/mpl-data/matplotlibrc
 
 
 ## Support

@@ -163,7 +163,7 @@ def get_softmax(values, tau=1.0):
     """ Return softmax of the given values. """
     e = np.exp(np.array(values[0]) / tau)
     softmax = e / np.sum(e)
-    # print(values[0], softmax)
+    # print("Softmax:", values[0], softmax)
     # workaround for numpy "sum not 1"-error = normalizing
     return softmax / sum(softmax)
 

@@ -74,6 +74,8 @@ def parse_args():
                             help='Temperature parameter (tau) decay after every step for the softmax weighting.')
     agent_args.add_argument('--tau_min', type=float, default=0.1,
                             help='Temperature parameter (tau) for the softmax weighting.')
+    agent_args.add_argument('--step_penalty', type=float, default=0.001,
+                            help='Penalty for performing any action.')
 
     model_args = parser.add_argument_group('Model')
     model_args.add_argument('--model', type=str, default='SimpleDQNModel',

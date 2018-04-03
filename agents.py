@@ -41,9 +41,9 @@ class Agent(object):
         self.tau_diff = 0.0
         self.loss = 0
 
+        self.step_penalty = self.args.step_penalty
         self.epoch = 0  # epoch counter
         self.episode = 0  # episode counter
-
         self.step_current = 0  # total steps so far
         self.step_episode = 0  # steps per episode
         self.total_reward = 0  # total reward so far
@@ -121,7 +121,7 @@ class Agent(object):
     def step(self):
         s = self.preprocess_input(self.env.get_observation())
         a = self.get_action(s, self.tau)
-        r = self.env.step(a)
+        r = self.env.step(a) - self.step_penalty
         is_terminal = not self.env.is_running() or r % 2 == 1
         return s, a, r, is_terminal
 

@@ -3,21 +3,26 @@ from __future__ import division
 from __future__ import print_function
 
 import csv
-import cv2
-import glob
+import logging
 import os
-import six
+
 import time
+
+import cv2
+# import glob
+
+from lab_rl.helper import get_human_readable, get_softmax, print_stats
+from lab_rl.models import SimpleDQNModel
+from lab_rl.replaymemories import SimpleReplayMemory
+
 import numpy as np
-import tensorflow as tf
+
+import six
 
 from six.moves import range
 
-from lab_rl.models import SimpleDQNModel
-from lab_rl.replaymemories import SimpleReplayMemory
-from lab_rl.helper import get_human_readable, get_softmax, print_stats
+import tensorflow as tf
 
-import logging
 _logger = logging.getLogger(__name__)
 
 # Ignore all numpy warnings during training
@@ -27,7 +32,9 @@ np.seterr(all='ignore')
 class Agent(object):
     def __init__(self, args, rng, env, paths=None):
         _logger.info("Initializing Agent (type: %s, load_model: %s)" %
-                     (args.agent, str(isinstance(args.load_model, six.string_types))))
+                     (args.agent,
+                      str(isinstance(args.load_model,
+                                     six.string_types))))
         self.args = args
         self.rng = rng
         self.env = env
@@ -85,7 +92,8 @@ class Agent(object):
                      'tau',
                      'loss',
                      'batch_size')
-        self.csv_train_file = open(os.path.join(self.paths['log_path'], 'stats_train.csv'), "wb")
+        self.csv_train_file = open(
+                os.path.join(self.paths['log_path'], 'stats_train.csv'), "wb")
         self.csv_train_writer = csv.writer(self.csv_train_file)
         self.csv_write_train(first_row)
 
@@ -101,7 +109,8 @@ class Agent(object):
                      'episodes',
                      'reward_avg',
                      'steps_avg')
-        self.csv_test_file = open(os.path.join(self.paths['log_path'], 'stats_test.csv'), "wb")
+        self.csv_test_file = open(
+                os.path.join(self.paths['log_path'], 'stats_test.csv'), "wb")
         self.csv_test_writer = csv.writer(self.csv_test_file)
         self.csv_write_test(first_row)
 
@@ -140,8 +149,10 @@ class Agent(object):
         self.total_reward += self.episode_reward
         self.loss = sum(self.episode_losses)/len(self.episode_losses)
         new_row = (self.episode,  # current episode
-                   "{0:.1f}".format(time.time() - self.start_time),  # total time
-                   "{0:.1f}".format(time.time() - self.episode_start_time),  # episode duration
+                   "{0:.1f}".format(time.time() - self.start_time),
+                   # total time
+                   "{0:.1f}".format(time.time() - self.episode_start_time),
+                   # episode duration
                    self.step_current,  # total steps so far
                    self.step_episode,  # steps per episode
                    self.total_reward,  # total reward so far
@@ -150,7 +161,9 @@ class Agent(object):
                    "{0:.4f}".format(self.loss),  # avg loss per tau
                    self.batch_size  # current batch size used for training
                    )
-        # print('Train Episode', self.episode, '(steps:', self.step_current,')finished. Reward:', self.episode_reward)
+        # print('Train Episode', self.episode,
+        #       '(steps:', self.step_current,')finished.
+        #       Reward:', self.episode_reward)
         if not self.args.play:
             self.csv_write_train(new_row)
 
@@ -168,21 +181,28 @@ class Agent(object):
         test_reward, test_steps = self.test(self.args.test_episodes)
 
         new_row = (self.epoch,  # current epoch
-                   "{0:.1f}".format(time.time() - self.start_time),  # total time
-                   "{0:.1f}".format(time.time() - self.epoch_start_time),  # epoch duration
+                   "{0:.1f}".format(time.time() - self.start_time),
+                   # total time
+                   "{0:.1f}".format(time.time() - self.epoch_start_time),
+                   # epoch duration
                    self.step_current,  # total steps so far
                    self.episode,  # total episodes so far
-                   "{0:.4f}".format(test_reward),  # avg reward per episode during testing
-                   "{0:.4f}".format(test_steps)  # avg steps per episode during testing
+                   "{0:.4f}".format(test_reward),
+                   # avg reward per episode during testing
+                   "{0:.4f}".format(test_steps)
+                   # avg steps per episode during testing
                    )
         # if self.test_reward_best <= test_reward:
         # self.test_reward_best = test_reward
         # self.model_name = "DQN_{:04}".format(
-        #    int(self.step_current / (self.args.backup_frequency * self.args.steps)))
-        # for old in glob.glob(os.path.join(self.paths['model_path'],'DQN_epoch_*')):
+        #    int(self.step_current /
+        #        (self.args.backup_frequency * self.args.steps)))
+        # for old in glob.glob(
+        #       os.path.join(self.paths['model_path'],'DQN_epoch_*')):
         #    os.remove(old)
         self.model_name = 'DQN_epoch_{:04}'.format(self.epoch)
-        self.model_last = os.path.join(self.paths['model_path'], self.model_name)
+        self.model_last = os.path.join(self.paths['model_path'],
+                                       self.model_name)
         self.saver.save(self.session, self.model_last)
         _logger.info("Saved network after epoch %i (%i steps): %s" %
                      (self.epoch, self.step_current, self.model_name))
@@ -217,7 +237,11 @@ class Agent(object):
             video_path = os.path.join(
                 self.paths['video_path'],
                 "video_" + self.model_name + ".avi")
-            out_video = cv2.VideoWriter(video_path, fourcc, self.args.fps, (self.args.width, self.args.height))
+            out_video = cv2.VideoWriter(
+                    video_path,
+                    fourcc,
+                    self.args.fps,
+                    (self.args.width, self.args.height))
         steps_total = 0
         reward_total = 0
         self.env.reset()
@@ -230,8 +254,9 @@ class Agent(object):
             steps_total += 1
             state_raw = self.env.get_observation()
             state = self.preprocess_input(state_raw)
-            action = self.get_action(state, self.args.tau_min)  # epsilon = 0.05, tau = 0.1
-            #reward_old = reward_total
+            action = self.get_action(state, self.args.tau_min)
+            # epsilon = 0.05, tau = 0.1
+            # reward_old = reward_total
             for _ in range(self.args.frame_repeat):
                 if self.args.show:
                     cv2.imshow("frame-test", state_raw)
@@ -249,8 +274,10 @@ class Agent(object):
         if save_video:
             out_video.release()
             print("Saved video (fps:%i, size:%s) to: %s [%s]" %
-                  (self.args.fps, str((self.args.width, self.args.height)),
-                   video_path, get_human_readable(os.path.getsize(video_path))))
+                  (self.args.fps,
+                   str((self.args.width, self.args.height)),
+                   video_path,
+                   get_human_readable(os.path.getsize(video_path))))
         if self.args.show:
             cv2.destroyAllWindows()
 
@@ -270,7 +297,8 @@ class SimpleDQNAgent(Agent):
 
         # Initiate tensorflow session
         self.session = tf.Session(config=config)
-        self.model_input_shape = (self.args.input_width, self.args.input_height) + \
+        self.model_input_shape = (self.args.input_width,
+                                  self.args.input_height) + \
                                  (self.args.color_channels,)
         self.model = SimpleDQNModel(self.args,
                                     self.rng,
@@ -289,9 +317,10 @@ class SimpleDQNAgent(Agent):
             init = tf.global_variables_initializer()
             self.session.run(init)
         if not self.args.play:
-        # Backup initial model weights
+            # Backup initial model weights
             self.model_name = "DQN_0000"
-            self.model_last = os.path.join(self.paths['model_path'], self.model_name)
+            self.model_last = os.path.join(self.paths['model_path'],
+                                           self.model_name)
             self.saver.save(self.session, self.model_last)
 
     def train_model(self):
@@ -303,8 +332,10 @@ class SimpleDQNAgent(Agent):
             qs = self.model.get_qs(s)
             # print('Qs', qs[0])
             max_qs = np.max(self.model.get_qs(s_prime), axis=1)
-            # print('a', a[0], 'r', r[0], 'gamma', self.args.gamma, 'q_s_prime', max_qs[0])
-            qs[np.arange(qs.shape[0]), a] = r + (1 - is_terminal) * self.args.gamma * max_qs
+            # print('a', a[0], 'r', r[0], 'gamma',
+            #       self.args.gamma, 'q_s_prime', max_qs[0])
+            qs[np.arange(qs.shape[0]), a] = r + (1 - is_terminal) * (
+                    self.args.gamma * max_qs)
             # print('Qs_updated', qs[0])
             return self.model.train(s, qs)
         return 0.0
@@ -347,7 +378,8 @@ class SimpleDQNAgent(Agent):
             if not self.env.is_running() or is_terminal:
                 self.episode_cleanup()
                 self.episode_reset()
-            if self.step_current % (self.args.backup_frequency * self.args.steps) == 0:
+            if self.step_current % \
+                    (self.args.backup_frequency * self.args.steps) == 0:
                 if self.env.is_running() or not is_terminal:
                     self.episode_cleanup()
                 self.epoch_cleanup()

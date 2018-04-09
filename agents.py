@@ -121,9 +121,9 @@ class Agent(object):
     def step(self):
         s = self.preprocess_input(self.env.get_observation())
         a = self.get_action(s, self.tau)
-        r = self.env.step(a) - self.step_penalty
+        r = self.env.step(a)
         is_terminal = not self.env.is_running() or r % 2 == 1
-        return s, a, r, is_terminal
+        return s, a, r - self.step_penalty, is_terminal
 
     def episode_reset(self):
         self.episode += 1

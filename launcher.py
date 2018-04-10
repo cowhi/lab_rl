@@ -92,6 +92,9 @@ def parse_args():
                             help='Vertical size of the input images for the network.')
     model_args.add_argument('--batch_size', type=int, default=32,
                             help='Batch size during network training.')
+    model_args.add_argument('--target_update_frequency', type=int,
+                            default=5000,
+                            help='Update frequency of the target network.')
 
     memory_args = parser.add_argument_group('Memory')
     model_args.add_argument('--memory', type=str, default='SimpleReplayMemory',

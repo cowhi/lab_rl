@@ -43,7 +43,7 @@ class SimpleDQNModel(TensorflowModel):
                 shape=[None] + list(self.input_shape),
                 dtype=tf.float32)
         # Build the network
-        self.q_policy = self.build_network_bigger()
+        self.q_policy = self.build_network()
         # Define a placeholder for loss calculation
         self.q_placeholder = tf.placeholder(shape=[None, self.output_shape],
                                             dtype=tf.float32)

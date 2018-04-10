@@ -69,29 +69,35 @@ class SimpleDQNModel(TensorflowModel):
         # Create the hidden layers of the network.
         conv1 = tf.contrib.layers.conv2d(self.s_placeholder,
                                          num_outputs=16,
-                                         kernel_size=[8, 8],
-                                         stride=[4, 4],
+                                         kernel_size=[8, 8, self.args.sequence_length],
+                                         stride=[4, 4, self.args.sequence_length],
                                          scope=self.scope+"/conv1")
         conv2 = tf.contrib.layers.conv2d(conv1,
                                          num_outputs=32,
-                                         kernel_size=[4, 4],
-                                         stride=[2, 2],
+                                         kernel_size=[4, 4, self.args.sequence_length],
+                                         stride=[2, 2, self.args.sequence_length],
                                          scope=self.scope+"/conv2")
         conv3 = tf.contrib.layers.conv2d(conv2,
                                          num_outputs=32,
-                                         kernel_size=[3, 3],
-                                         stride=[1, 1],
+                                         kernel_size=[3, 3, self.args.sequence_length],
+                                         stride=[1, 1, self.args.sequence_length],
                                          scope=self.scope+"/conv3")
         conv3_flat = tf.contrib.layers.flatten(conv3,
                                                scope=self.scope+"/conv3_flat")
         fc1 = tf.contrib.layers.fully_connected(conv3_flat,
-                                                num_outputs=128,
+                                                num_outputs=256,
                                                 scope=self.scope+"/fc1")
         # Create the output layer of the network
         q = tf.contrib.layers.fully_connected(fc1,
                                               num_outputs=self.output_shape,
                                               activation_fn=None,
                                               scope=self.scope+"/q")
+        print(conv1)
+        print(conv2)
+        print(conv3)
+        print(conv3_flat)
+        print(fc1)
+        print(q)
         return q
 
     def train(self, state, q):

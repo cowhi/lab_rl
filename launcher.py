@@ -23,7 +23,7 @@ def parse_args():
     experiment_args = parser.add_argument_group('Experiment')
     experiment_args.add_argument('--runs', type=int, default=1,
                                  help='Number of runs to perform the experiment.')
-    experiment_args.add_argument('--steps', type=int, default=100000,
+    experiment_args.add_argument('--steps', type=int, default=200000,
                                  help='Number of steps to run the agent')
     experiment_args.add_argument('--log_level', type=str, default='info',
                                  help='The log level for the log file.')
@@ -52,15 +52,15 @@ def parse_args():
                                   help='Set the runfiles path to find DeepMind Lab data')
     environment_args.add_argument('--level_script', type=str, default='lab_rl/apple_square_run',
                                   help='The environment level script to load')
-    environment_args.add_argument('--color_channels', type=int, default=3,
+    environment_args.add_argument('--color_channels', type=int, default=1,
                                   help='The number of color channels for the environment.')
 
     agent_args = parser.add_argument_group('Agent')
     agent_args.add_argument('--agent', type=str, default='DQNAgent',
                             help='The agent we want to use for training.')
-    agent_args.add_argument('--frame_repeat', type=int, default=4,
+    agent_args.add_argument('--frame_repeat', type=int, default=10,
                             help='The number of frames where an action is repeated.')
-    agent_args.add_argument('--test_episodes', type=int, default=10,
+    agent_args.add_argument('--test_episodes', type=int, default=5,
                             help='The number of test episodes for evaluation.')
     agent_args.add_argument('--epsilon_start', type=float, default=1.0,
                             help='Exploration rate (epsilon) at the beginning of training.')
@@ -90,17 +90,22 @@ def parse_args():
                             help='Horizontal size of the input images for the network.')
     model_args.add_argument('--input_height', type=int, default=80,
                             help='Vertical size of the input images for the network.')
+    model_args.add_argument('--sequence_length', type=int, default=4,
+                            help='Defines the number of images that are necessary to capture the dynamics.')
     model_args.add_argument('--batch_size', type=int, default=32,
                             help='Batch size during network training.')
     model_args.add_argument('--target_update_frequency', type=int,
                             default=5000,
                             help='Update frequency of the target network.')
+    
 
     memory_args = parser.add_argument_group('Memory')
     model_args.add_argument('--memory', type=str, default='SimpleReplayMemory',
                             help='The replay memory we want to use for training.')
     memory_args.add_argument('--memory_size', type=int, default=50000,
                              help='Size of the replay memory.')
+    memory_args.add_argument('--priority_factor', type=float, default=0.6,
+                             help='Indicates how much prioritization is used for memory samples.')
 
     return parser.parse_args()
 
@@ -154,8 +159,8 @@ def main():
 
         # Plot experiment
         if not args.play:
-            plot_experiment(paths['log_path'], 'stats_train', 'episode')
-            plot_experiment(paths['log_path'], 'stats_test', 'epoch')
+            # plot_experiment(paths['log_path'], 'stats_train', 'episode')
+            # plot_experiment(paths['log_path'], 'stats_test', 'epoch')
             _logger.info("Finished")
     # Plot experiment
     if not args.play:

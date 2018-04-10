@@ -12,7 +12,8 @@ import time
 import cv2
 # import glob
 
-from lab_rl.helper import get_human_readable, get_softmax, print_stats
+from lab_rl.buffer import Buffer
+from lab_rl.helper import get_human_readable, get_softmax, plot_experiment, print_stats
 from lab_rl.models import SimpleDQNModel
 from lab_rl.replaymemories import SimpleReplayMemory
 
@@ -75,6 +76,7 @@ class Agent(object):
         self.model_name = None
         self.model_last = None
         self.model_input_shape = None
+        self.observation_shape = None
         # Model parameter
         self.session = None
         self.saver = None
@@ -82,6 +84,11 @@ class Agent(object):
         self.episode_start_time = self.start_time
         self.epoch_start_time = self.start_time
         self.batch_size = self.args.batch_size
+        # Initialize a buffer to turn observations into states
+        self.buffer = Buffer(self.args.sequence_length,
+                             self.args.input_width,
+                             self.args.input_height,
+                             self.args.color_channels)
 
     def prepare_csv_train(self):
         first_row = ('episode',
@@ -124,14 +131,20 @@ class Agent(object):
         if self.args.color_channels == 1:
             img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         img = cv2.resize(img, (self.args.input_width, self.args.input_height))
-        return np.reshape(img, self.model_input_shape)
+        # print("img:", img.shape)
+        # print("model:", self.model_input_shape)
+        # return np.reshape(img, self.model_input_shape)
+        # print("observation:", self.observation_shape)
+        return np.reshape(img, self.observation_shape)
 
     def get_action(self, *args):
         pass
 
     def step(self):
-        s = self.preprocess_input(self.env.get_observation())
-        a = self.get_action(s, self.tau)
+        o = self.preprocess_input(self.env.get_observation())
+        self.buffer.add(o)
+        s = self.buffer.get_state()
+        a = self.get_action(s[None, ...], self.tau)
         r = self.env.step(a)
         is_terminal = not self.env.is_running() or r % 2 == 1
         return s, a, r - self.step_penalty, is_terminal
@@ -210,6 +223,10 @@ class Agent(object):
                      (self.epoch, self.step_current, self.model_name))
         if not self.args.play:
             self.csv_write_test(new_row)
+            # TODO: update graphplots!!!
+            if self.epoch > 0:
+                plot_experiment(self.paths['log_path'], 'stats_train', 'episode')
+                plot_experiment(self.paths['log_path'], 'stats_test', 'epoch')
 
     def test(self, episodes):
         print('TESTING')
@@ -255,8 +272,10 @@ class Agent(object):
                 return reward_total, steps_total
             steps_total += 1
             state_raw = self.env.get_observation()
-            state = self.preprocess_input(state_raw)
-            action = self.get_action(state, self.args.tau_min)
+            observation = self.preprocess_input(state_raw)
+            self.buffer.add(observation)
+            state = self.buffer.get_state()
+            action = self.get_action(state[None, ...], self.args.tau_min)
             # epsilon = 0.05, tau = 0.1
             # reward_old = reward_total
             for _ in range(self.args.frame_repeat):
@@ -438,7 +457,14 @@ class DQNAgent(Agent):
 
         # Initiate tensorflow session
         self.session = tf.Session(config=config)
-        self.model_input_shape = (self.args.input_width,
+        # self.model_input_shape = (self.args.input_width,
+        #                          self.args.input_height) + \
+        #                         (self.args.color_channels,)
+        # print("Old:", self.model_input_shape)
+        self.model_input_shape = (self.args.sequence_length,) + \
+                                 (self.args.input_width, self.args.input_height) + \
+                                 (self.args.color_channels,)
+        self.observation_shape = (self.args.input_width,
                                   self.args.input_height) + \
                                  (self.args.color_channels,)
         # Policy network
@@ -481,6 +507,7 @@ class DQNAgent(Agent):
         # train model with random batch from memory
         # if self.step_current % int((1/5)*self.args.steps) == 0:
         #    self.batch_size *= 2
+        # TODO: add dynamics (combine 4 observations to one state)
         if self.memory.size > 2 * self.batch_size:
             s, a, r, s_prime, is_terminal = self.memory.get_batch()
             # values from current policy

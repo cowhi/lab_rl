@@ -42,9 +42,9 @@ class Experiment(object):
             self.env = LabAllActions(self.args, self.rng)
 
         # Initialize agent
-        if self.args.agent == 'SimpleDQNAgent':
-            from lab_rl.agents import SimpleDQNAgent
-            self.agent = SimpleDQNAgent(self.args, self.rng, self.env, self.paths)
+        if self.args.agent == 'DQNAgent':
+            from lab_rl.agents import DQNAgent
+            self.agent = DQNAgent(self.args, self.rng, self.env, self.paths)
         elif self.args.agent == 'RandomAgent':
             from lab_rl.agents import RandomAgent
             self.agent = RandomAgent(self.args, self.rng, self.env, self.paths)

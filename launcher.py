@@ -56,7 +56,7 @@ def parse_args():
                                   help='The number of color channels for the environment.')
 
     agent_args = parser.add_argument_group('Agent')
-    agent_args.add_argument('--agent', type=str, default='SimpleDQNAgent',
+    agent_args.add_argument('--agent', type=str, default='DQNAgent',
                             help='The agent we want to use for training.')
     agent_args.add_argument('--frame_repeat', type=int, default=4,
                             help='The number of frames where an action is repeated.')

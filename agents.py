@@ -447,16 +447,16 @@ class DQNAgent(Agent):
                                     self.session,
                                     self.model_input_shape,
                                     self.available_actions,
-                                    self.paths['model_path'])
+                                    self.paths['model_path'],
+                                    'policy')
         # Target network
         self.target_model = SimpleDQNModel(self.args,
                                            self.rng,
                                            self.session,
                                            self.model_input_shape,
                                            self.available_actions,
-                                           self.paths['model_path'])
-        # We want to have two similar networks
-        self.copy_model_parameters()
+                                           self.paths['model_path'],
+                                           'target')
 
         self.memory = SimpleReplayMemory(self.args,
                                          self.rng,
@@ -468,6 +468,8 @@ class DQNAgent(Agent):
         else:
             init = tf.global_variables_initializer()
             self.session.run(init)
+        # We want to have two similar networks
+        self.copy_model_parameters()
         if not self.args.play:
             # Backup initial model weights
             self.model_name = "DQN_0000"
@@ -522,7 +524,7 @@ class DQNAgent(Agent):
             op = target_v.assign(policy_v)
             update_ops.append(op)
 
-        self.sess.run(update_ops)
+        self.session.run(update_ops)
 
     def update_tau(self):
         # Update tau if necessary

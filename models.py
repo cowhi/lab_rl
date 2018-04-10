@@ -12,9 +12,10 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 
 class Model(object):
-    def __init__(self, args, rng, log_path):
+    def __init__(self, args, rng, log_path, scope):
         _logger.info("Initializing Model (Type: %s)" %
                      args.model)
+        self.scope = scope
         self.args = args
         self.rng = rng
         self.log_path = log_path
@@ -22,9 +23,9 @@ class Model(object):
 
 class TensorflowModel(Model):
     def __init__(self, args, rng, session,
-                 input_shape, output_shape, log_path):
+                 input_shape, output_shape, log_path, scope):
         # Call super class
-        super(TensorflowModel, self).__init__(args, rng, log_path)
+        super(TensorflowModel, self).__init__(args, rng, log_path, scope)
         self.session = session
         self.input_shape = input_shape
         self.output_shape = output_shape
@@ -32,11 +33,11 @@ class TensorflowModel(Model):
 
 class SimpleDQNModel(TensorflowModel):
     def __init__(self, args, rng, session,
-                 input_shape, output_shape, log_path):
+                 input_shape, output_shape, log_path, scope):
         # Call super class
         super(SimpleDQNModel, self).__init__(args, rng, session,
                                              input_shape, output_shape,
-                                             log_path)
+                                             log_path, scope)
 
         # Define a placeholder for network input
         self.s_placeholder = tf.placeholder(
@@ -58,7 +59,7 @@ class SimpleDQNModel(TensorflowModel):
         self.train_step = self.optimizer.minimize(self.loss)
 
         # Define layer for selecting only the max value
-        self.action = tf.argmax(self.q, 1)
+        self.action = tf.argmax(self.q_policy, 1)
 
         # Define layer for a softmax output
         # TODO check if this works or if I should use agent to do it
@@ -105,7 +106,7 @@ class SimpleDQNModel(TensorflowModel):
         state = state.astype(np.float32)
         if len(state.shape) == 3:
             state = state.reshape([1] + list(self.input_shape))
-        return self.session.run(self.q,
+        return self.session.run(self.q_policy,
                                 feed_dict={self.s_placeholder: state})
 
     def get_action_probs(self, state):

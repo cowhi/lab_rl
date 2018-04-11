@@ -245,8 +245,8 @@ class Agent(object):
         print('TESTING')
         episode_rewards = []
         episode_steps = []
-        save_video = False
         for episode in range(0, episodes):
+            save_video = False
             # self.bla = episode
             if episode == 0 and self.args.save_video:
                 save_video = True
@@ -621,6 +621,7 @@ class DQNAgent(Agent):
         self.epoch_reset()
         print("TRAINING")
         self.episode_reset()
+        self.run_test = False
         for self.step_current in range(1, self.args.steps+1):
             self.step_episode += 1
             # self.tau = self.update_tau()
@@ -633,6 +634,12 @@ class DQNAgent(Agent):
             # End episode if necessary
             if not self.env.is_running() or is_terminal:
                 self.episode_cleanup()
+                if self.run_test:
+                    self.epoch_cleanup()
+                    self.epoch_reset()
+                    self.run_test = False
+                    if not self.step_current == self.args.steps:
+                        print("TRAINING")
                 self.episode_reset()
             # Copy network weights from time to time
             if self.step_current % self.args.target_update_frequency == 0:
@@ -640,10 +647,6 @@ class DQNAgent(Agent):
             # End epoch if necessary
             if self.step_current % \
                     (self.args.backup_frequency * self.args.steps) == 0:
-                if self.env.is_running() or not is_terminal:
-                    self.episode_cleanup()
-                self.epoch_cleanup()
-                self.epoch_reset()
-                if not self.step_current == self.args.steps:
-                    print("TRAINING")
-                    self.episode_reset()
+                self.run_test = True
+            
+                

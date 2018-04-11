@@ -50,7 +50,7 @@ class SimpleDQNModel(TensorflowModel):
                                             dtype=tf.float32)
         # Define important network parameters
         # self.loss = tf.losses.mean_squared_error(self.q_placeholder,
-        #                                          self.q_policy)
+        #                                         self.q_policy)
         self.loss = tf.losses.huber_loss(self.q_placeholder, self.q_policy)
         # self.optimizer = tf.train.RMSPropOptimizer(self.args.alpha)
         self.optimizer = tf.train.AdamOptimizer(self.args.alpha)
@@ -92,12 +92,12 @@ class SimpleDQNModel(TensorflowModel):
                                               num_outputs=self.output_shape,
                                               activation_fn=None,
                                               scope=self.scope+"/q")
-        print(conv1)
-        print(conv2)
-        print(conv3)
-        print(conv3_flat)
-        print(fc1)
-        print(q)
+        # print(conv1)
+        # print(conv2)
+        # print(conv3)
+        # print(conv3_flat)
+        # print(fc1)
+        # print(q)
         return q
 
     def train(self, state, q):

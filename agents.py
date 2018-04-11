@@ -45,6 +45,7 @@ class Agent(object):
         self.episode_losses = []
         self.epoch_rewards = []
         self.available_actions = self.env.count_actions()
+        self.exploration_method = self.args.exploration_method
         self.epsilon = self.args.epsilon_start
         self.tau = self.args.tau_start
         self.tau_diff = 0.0
@@ -89,6 +90,15 @@ class Agent(object):
                              self.args.input_width,
                              self.args.input_height,
                              self.args.color_channels)
+        if self.exploration_method == "epsilon":
+            epsilon_decline = np.linspace(self.args.epsilon_start,
+                                          self.args.epsilon_min,
+                                          int(self.args.epsilon_decay * self.args.steps))
+            rest = self.args.epsilon_min * np.ones(self.args.steps - epsilon_decline.shape[0])
+            self.epsilons = np.append(epsilon_decline, rest)
+        elif self.exploration_method == "tau":
+            self.taus = self.generate_taus()
+            #print(self.taus.shape)
 
     def prepare_csv_train(self):
         first_row = ('episode',
@@ -162,7 +172,11 @@ class Agent(object):
         # print('Episode', self.episode, 'END')
         self.epoch_rewards.append(self.episode_reward)
         self.total_reward += self.episode_reward
-        self.loss = sum(self.episode_losses)/len(self.episode_losses)
+        # TODO: Figure out why len(self.episode_losses) is sometimes 0 
+        if not len(self.episode_losses) == 0:
+            self.loss = sum(self.episode_losses)/len(self.episode_losses)
+        else:
+            self.loss = 0.0
         new_row = (self.episode,  # current episode
                    "{0:.1f}".format(time.time() - self.start_time),
                    # total time
@@ -223,7 +237,6 @@ class Agent(object):
                      (self.epoch, self.step_current, self.model_name))
         if not self.args.play:
             self.csv_write_test(new_row)
-            # TODO: update graphplots!!!
             if self.epoch > 0:
                 plot_experiment(self.paths['log_path'], 'stats_train', 'episode')
                 plot_experiment(self.paths['log_path'], 'stats_test', 'epoch')
@@ -369,14 +382,29 @@ class SimpleDQNAgent(Agent):
         return self.args.epsilon_start - \
                steps * (self.args.epsilon_start - self.args.epsilon_min) / \
                (self.args.epsilon_decay * self.args.steps)
-    '''
+    
 
     def update_tau(self):
         # Update tau if necessary
         if self.tau <= self.args.tau_min:
             return self.args.tau_min
         return self.tau - self.tau * self.args.tau_decay
-
+    '''
+    
+    def generate_taus(self):
+        rate = ((self.args.tau_start/self.args.tau_min)**(1./(int(self.args.tau_decay*self.args.steps)))) - 1
+        taus = []
+        tau = self.args.tau_start
+        for i in range(int(self.args.tau_decay*self.args.steps)):
+            if tau > self.args.tau_min:
+                taus.append(tau)
+            else:
+                break
+            tau -= tau * rate
+        for i in range(self.args.steps - len(taus)):
+            taus.append(self.args.tau_min)
+        return np.array(taus)
+    
     def get_action(self, state, tau):
         """ Returns an action selected through softmax. """
         # print(self.step_current, self.tau, self.batch_size)
@@ -525,16 +553,6 @@ class DQNAgent(Agent):
             return self.model.train(s, qs)
         return 0.0
 
-    '''
-    def update_epsilon(self, steps):
-        # Update epsilon if necessary
-        if steps > self.args.epsilon_decay * self.args.steps:
-            return self.args.epsilon_min
-        return self.args.epsilon_start - \
-               steps * (self.args.epsilon_start - self.args.epsilon_min) / \
-               (self.args.epsilon_decay * self.args.steps)
-    '''
-
     def copy_model_parameters(self):
         """ Copies the trainable network parameters from the
             current policy network to the target network
@@ -552,19 +570,51 @@ class DQNAgent(Agent):
             update_ops.append(op)
 
         self.session.run(update_ops)
-
+    
+    '''
+    def update_epsilon(self, steps):
+        # Update epsilon if necessary
+        # TODO: check this
+        if steps > self.args.epsilon_decay * self.args.steps:
+            return self.args.epsilon_min
+        return self.args.epsilon_start - \
+               steps * (self.args.epsilon_start - self.args.epsilon_min) / \
+               (self.args.epsilon_decay * self.args.steps)    
+    '''
+    
+    '''
     def update_tau(self):
         # Update tau if necessary
         if self.tau <= self.args.tau_min:
             return self.args.tau_min
         return self.tau - self.tau * self.args.tau_decay
+    '''
+    
+    def generate_taus(self):
+        rate = ((self.args.tau_start/self.args.tau_min)**(1./(int(self.args.tau_decay*self.args.steps)))) - 1
+        taus = []
+        tau = self.args.tau_start
+        for i in range(int(self.args.tau_decay*self.args.steps)):
+            if tau > self.args.tau_min:
+                taus.append(tau)
+            else:
+                break
+            tau -= tau * rate
+        for i in range(self.args.steps - len(taus)):
+            taus.append(self.args.tau_min)
+        return np.array(taus)
 
     def get_action(self, state, tau):
         """ Returns an action selected through softmax. """
-        # print(self.step_current, self.tau, self.batch_size)
-        return self.rng.choice(self.available_actions,
-                               p=get_softmax(self.model.get_qs(state),
-                                             tau))
+        # TODO: Get actions from model
+        if self.exploration_method == "tau":
+            # print(self.step_current, self.tau, self.batch_size)
+            return self.rng.choice(self.available_actions,
+                                   p=get_softmax(self.model.get_qs(state),
+                                                 tau))
+        if self.exploration_method == "epsilon":
+            sys.exit()
+            
 
     def train(self):
         self.epoch_cleanup()
@@ -573,7 +623,9 @@ class DQNAgent(Agent):
         self.episode_reset()
         for self.step_current in range(1, self.args.steps+1):
             self.step_episode += 1
-            self.tau = self.update_tau()
+            # self.tau = self.update_tau()
+            # print(self.step_current)
+            self.tau = self.taus[self.step_current-1]
             s, a, r, is_terminal = self.step()
             self.episode_reward += r
             self.memory.add(s, a, r, is_terminal)

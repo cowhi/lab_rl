@@ -58,20 +58,22 @@ def parse_args():
     agent_args = parser.add_argument_group('Agent')
     agent_args.add_argument('--agent', type=str, default='DQNAgent',
                             help='The agent we want to use for training.')
-    agent_args.add_argument('--frame_repeat', type=int, default=10,
+    agent_args.add_argument('--frame_repeat', type=int, default=4,
                             help='The number of frames where an action is repeated.')
     agent_args.add_argument('--test_episodes', type=int, default=5,
                             help='The number of test episodes for evaluation.')
+    agent_args.add_argument('--exploration_method', type=str, default='tau',
+                            help='The way the agent performes exploration (tau/epsilon).')
     agent_args.add_argument('--epsilon_start', type=float, default=1.0,
                             help='Exploration rate (epsilon) at the beginning of training.')
-    agent_args.add_argument('--epsilon_decay', type=float, default=0.7,
-                            help='Percentage of all steps from starting epsilon to minimum epsilon.')
-    agent_args.add_argument('--epsilon_min', type=float, default=0.01,
+    agent_args.add_argument('--epsilon_min', type=float, default=0.1,
                             help='Minimum value of exploration rate (epsilon) during training.')
+    agent_args.add_argument('--epsilon_decay', type=float, default=0.8,
+                            help='Percentage of all steps from starting epsilon to minimum epsilon.')
     agent_args.add_argument('--tau_start', type=float, default=100.0,
                             help='Temperature parameter (tau) for the softmax weighting.')
-    agent_args.add_argument('--tau_decay', type=float, default=0.00007,
-                            help='Temperature parameter (tau) decay after every step for the softmax weighting.')
+    agent_args.add_argument('--tau_decay', type=float, default=0.8,
+                            help='Percentage of all steps for temperature parameter (tau) decay.')
     agent_args.add_argument('--tau_min', type=float, default=0.1,
                             help='Temperature parameter (tau) for the softmax weighting.')
     agent_args.add_argument('--step_penalty', type=float, default=0.001,
@@ -82,9 +84,9 @@ def parse_args():
                             help='The model we want to use for training.')
     model_args.add_argument('--load_model', type=str, default=None,
                             help='The path to a model to load for the agent.')
-    model_args.add_argument('--alpha', type=float, default=0.00025,
+    model_args.add_argument('--alpha', type=float, default=0.001,
                             help='The learning rate (alpha) of the model.')
-    model_args.add_argument('--gamma', type=float, default=0.9,
+    model_args.add_argument('--gamma', type=float, default=0.99,
                             help='The discount factor (gamma) of the model.')
     model_args.add_argument('--input_width', type=int, default=80,
                             help='Horizontal size of the input images for the network.')
@@ -95,7 +97,7 @@ def parse_args():
     model_args.add_argument('--batch_size', type=int, default=32,
                             help='Batch size during network training.')
     model_args.add_argument('--target_update_frequency', type=int,
-                            default=5000,
+                            default=2000,
                             help='Update frequency of the target network.')
     
 

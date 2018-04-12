@@ -91,24 +91,32 @@ class Agent(object):
                              self.args.input_height,
                              self.args.color_channels)
         if self.exploration_method == "epsilon":
-            epsilon_decline = np.linspace(self.args.epsilon_start,
-                                          self.args.epsilon_min,
-                                          int(self.args.epsilon_decay * self.args.steps))
-            rest = self.args.epsilon_min * np.ones(self.args.steps - epsilon_decline.shape[0])
-            self.epsilons = np.append(epsilon_decline, rest)
+            self.epsilons = self.generate_epsilons()
+            self.tau = self.args.tau_start
         elif self.exploration_method == "tau":
             self.taus = self.generate_taus()
+            self.epsilon = self.args.epsilon_start
             #print(self.taus.shape)
 
+    def generate_epsilons(self):
+        epsilon_decline = np.linspace(
+                self.args.epsilon_start,
+                self.args.epsilon_min,
+                int(self.args.epsilon_decay * self.args.steps))
+        rest = self.args.epsilon_min * \
+                np.ones(self.args.steps - epsilon_decline.shape[0])
+        return np.append(epsilon_decline, rest)
+            
     def prepare_csv_train(self):
         first_row = ('episode',
                      'time',
                      'duration',
-                     'steps_total',
                      'steps',
-                     'reward_total',
                      'reward',
+                     'steps_total',
+                     'reward_total',
                      'tau',
+                     'epsilon',
                      'loss',
                      'batch_size')
         self.csv_train_file = open(
@@ -154,7 +162,7 @@ class Agent(object):
         o = self.preprocess_input(self.env.get_observation())
         self.buffer.add(o)
         s = self.buffer.get_state()
-        a = self.get_action(s[None, ...], self.tau)
+        a = self.get_action(s[None, ...])
         r = self.env.step(a)
         is_terminal = not self.env.is_running() or r % 2 == 1
         return s, a, r - self.step_penalty, is_terminal
@@ -182,14 +190,16 @@ class Agent(object):
                    # total time
                    "{0:.1f}".format(time.time() - self.episode_start_time),
                    # episode duration
-                   self.step_current,  # total steps so far
                    self.step_episode,  # steps per episode
-                   self.total_reward,  # total reward so far
                    self.episode_reward,  # reward per episode
+                   self.step_current,  # total steps so far
+                   self.total_reward,  # total reward so far
                    "{0:.4f}".format(self.tau),  # current tau
-                   "{0:.4f}".format(self.loss),  # avg loss per tau
+                   "{0:.5f}".format(self.epsilon),  # current epsilon
+                   "{0:.4f}".format(self.loss),  # avg loss per batch
                    self.batch_size  # current batch size used for training
                    )
+        # print(new_row)
         # print('Train Episode', self.episode,
         #       '(steps:', self.step_current,')finished.
         #       Reward:', self.episode_reward)
@@ -242,6 +252,13 @@ class Agent(object):
                 plot_experiment(self.paths['log_path'], 'stats_test', 'epoch')
 
     def test(self, episodes):
+        if self.exploration_method == "tau":
+            backup_tau = self.tau
+            self.tau = self.args.tau_min
+        elif self.exploration_method == "epsilon":
+            backup_epsilon = self.epsilon
+            self.epsilon = self.args.epsilon_min
+        
         print('TESTING')
         episode_rewards = []
         episode_steps = []
@@ -258,6 +275,11 @@ class Agent(object):
                     sum(episode_steps),
                     episode_rewards,
                     time.time() - self.start_time)
+        if self.exploration_method == "tau":
+            self.tau = backup_tau
+        elif self.exploration_method == "epsilon":
+            self.epsilon = backup_epsilon
+        
         return sum(episode_rewards)/episodes, sum(episode_steps)/episodes
 
     def play(self, save_video, num_episodes=1):
@@ -288,7 +310,7 @@ class Agent(object):
             observation = self.preprocess_input(state_raw)
             self.buffer.add(observation)
             state = self.buffer.get_state()
-            action = self.get_action(state[None, ...], self.args.tau_min)
+            action = self.get_action(state[None, ...])
             # epsilon = 0.05, tau = 0.1
             # reward_old = reward_total
             for _ in range(self.args.frame_repeat):
@@ -604,16 +626,29 @@ class DQNAgent(Agent):
             taus.append(self.args.tau_min)
         return np.array(taus)
 
-    def get_action(self, state, tau):
+    
+    
+    
+    
+    
+    def get_action(self, state):
         """ Returns an action selected through softmax. """
         # TODO: Get actions from model
         if self.exploration_method == "tau":
             # print(self.step_current, self.tau, self.batch_size)
             return self.rng.choice(self.available_actions,
                                    p=get_softmax(self.model.get_qs(state),
-                                                 tau))
+                                                 self.tau))
         if self.exploration_method == "epsilon":
-            sys.exit()
+            if self.rng.random_sample() < self.epsilon:
+                # select random action
+                return self.rng.choice(self.available_actions)
+            else:
+                # if not random choose action with highest Q-value
+                return np.argmax(self.model.get_qs(state))
+            
+            
+            
             
 
     def train(self):
@@ -626,7 +661,10 @@ class DQNAgent(Agent):
             self.step_episode += 1
             # self.tau = self.update_tau()
             # print(self.step_current)
-            self.tau = self.taus[self.step_current-1]
+            if self.exploration_method == "tau":
+                self.tau = self.taus[self.step_current-1]
+            elif self.exploration_method == "epsilon":
+                self.epsilon = self.epsilons[self.step_current-1]
             s, a, r, is_terminal = self.step()
             self.episode_reward += r
             self.memory.add(s, a, r, is_terminal)

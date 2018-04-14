@@ -145,13 +145,16 @@ This class defines the kind of replay memory an agent can use during training.
 The most basic form of a replay memory. Just saves memories in a growing numpy array and selects random experiences during training.
 
 
+## Generate new maps
+This is a little bit annoying but I haven't found a quicker way:
+- Copy one of the *.lua and *_run.lua in the lab_rl folder and give them a good name for your map and update the variables
+- For the first run change the required factory to 'lab_rl.random_spawn_factory_map' in the NEW_run.lua file
+- Copy the temporary new map to the lab_rl folder to keep it in the repo and to the assets/map/ folder to use it
+- Change the required factory back to 'lab_rl.random_spawn_factory'
+
 ## TODOs
 Please realize, this is a work in progress, so let me know what to improve. The following are already on my list (not sure I can do them all):
 - Improve plots
-- Generate plots more often (already during training)
-- Add description on how to use custom maps
-- Improve stats for epochs
-- Implement test runs for agents
 - Make it easier to use (so people don't have to mess with existing files)
 - Possible to use extra thread for plot and video generation (play and test) ?!
 - Add support for continuous actions (discrete and continuous envs and agents)

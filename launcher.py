@@ -52,27 +52,27 @@ def parse_args():
                                   help='Set the runfiles path to find DeepMind Lab data')
     environment_args.add_argument('--level_script', type=str, default='lab_rl/apple_square_run',
                                   help='The environment level script to load')
-    environment_args.add_argument('--color_channels', type=int, default=1,
+    environment_args.add_argument('--color_channels', type=int, default=3,
                                   help='The number of color channels for the environment.')
 
     agent_args = parser.add_argument_group('Agent')
     agent_args.add_argument('--agent', type=str, default='DQNAgent',
                             help='The agent we want to use for training.')
-    agent_args.add_argument('--frame_repeat', type=int, default=4,
+    agent_args.add_argument('--frame_repeat', type=int, default=10,
                             help='The number of frames where an action is repeated.')
     agent_args.add_argument('--test_episodes', type=int, default=5,
                             help='The number of test episodes for evaluation.')
-    agent_args.add_argument('--exploration_method', type=str, default='tau',
+    agent_args.add_argument('--exploration_method', type=str, default='epsilon',
                             help='The way the agent performes exploration (tau/epsilon).')
     agent_args.add_argument('--epsilon_start', type=float, default=1.0,
                             help='Exploration rate (epsilon) at the beginning of training.')
     agent_args.add_argument('--epsilon_min', type=float, default=0.1,
                             help='Minimum value of exploration rate (epsilon) during training.')
-    agent_args.add_argument('--epsilon_decay', type=float, default=0.8,
+    agent_args.add_argument('--epsilon_decay', type=float, default=0.33,
                             help='Percentage of all steps from starting epsilon to minimum epsilon.')
     agent_args.add_argument('--tau_start', type=float, default=100.0,
                             help='Temperature parameter (tau) for the softmax weighting.')
-    agent_args.add_argument('--tau_decay', type=float, default=0.8,
+    agent_args.add_argument('--tau_decay', type=float, default=0.5,
                             help='Percentage of all steps for temperature parameter (tau) decay.')
     agent_args.add_argument('--tau_min', type=float, default=0.1,
                             help='Temperature parameter (tau) for the softmax weighting.')
@@ -82,9 +82,13 @@ def parse_args():
     model_args = parser.add_argument_group('Model')
     model_args.add_argument('--model', type=str, default='SimpleDQNModel',
                             help='The model we want to use for training.')
+    model_args.add_argument('--loss', type=str, default='mse',
+                            help='How to calculate the model loss (mse/huber).')
+    model_args.add_argument('--optimizer', type=str, default='RMSProp',
+                            help='Which optimizer to use (RMSProp/Adam).')
     model_args.add_argument('--load_model', type=str, default=None,
                             help='The path to a model to load for the agent.')
-    model_args.add_argument('--alpha', type=float, default=0.001,
+    model_args.add_argument('--alpha', type=float, default=0.00025,
                             help='The learning rate (alpha) of the model.')
     model_args.add_argument('--gamma', type=float, default=0.99,
                             help='The discount factor (gamma) of the model.')
@@ -94,10 +98,10 @@ def parse_args():
                             help='Vertical size of the input images for the network.')
     model_args.add_argument('--sequence_length', type=int, default=4,
                             help='Defines the number of images that are necessary to capture the dynamics.')
-    model_args.add_argument('--batch_size', type=int, default=32,
+    model_args.add_argument('--batch_size', type=int, default=64,
                             help='Batch size during network training.')
     model_args.add_argument('--target_update_frequency', type=int,
-                            default=2000,
+                            default=10000,
                             help='Update frequency of the target network.')
     
 

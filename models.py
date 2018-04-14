@@ -49,11 +49,16 @@ class SimpleDQNModel(TensorflowModel):
         self.q_placeholder = tf.placeholder(shape=[None, self.output_shape],
                                             dtype=tf.float32)
         # Define important network parameters
-        # self.loss = tf.losses.mean_squared_error(self.q_placeholder,
-        #                                         self.q_policy)
-        self.loss = tf.losses.huber_loss(self.q_placeholder, self.q_policy)
-        # self.optimizer = tf.train.RMSPropOptimizer(self.args.alpha)
-        self.optimizer = tf.train.AdamOptimizer(self.args.alpha)
+        if self.args.loss == "mse":
+            self.loss = tf.losses.mean_squared_error(self.q_placeholder,
+                                                     self.q_policy)
+        elif self.args.loss == "huber":
+            self.loss = tf.losses.huber_loss(self.q_placeholder, self.q_policy)
+        
+        if self.args.optimizer == "RMSProp":
+            self.optimizer = tf.train.RMSPropOptimizer(self.args.alpha)
+        elif self.args.optimizer == "Adam":
+            self.optimizer = tf.train.AdamOptimizer(self.args.alpha)
 
         # without gradient clipping
         self.train_step = self.optimizer.minimize(self.loss)

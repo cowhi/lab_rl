@@ -145,11 +145,11 @@ def main():
             'model_path': None,
             'video_path': None,
             'plot_path': None}
+        
+        # define and create log path
+        path_to_dir = os.path.join(os.path.expanduser("~"), ".lab", new_dir, 'run_{num:02d}'.format(num=run))
+        paths = make_path_structure(path_to_dir)
         if not args.play:
-            # define and create log path
-            path_to_dir = os.path.join(os.path.expanduser("~"), ".lab", new_dir, 'run_{num:02d}'.format(num=run))
-            paths = make_path_structure(path_to_dir)
-
             # Initialize and start logger
             prepare_logger(paths['log_path'], args.log_level)
             _logger = logging.getLogger(__name__)

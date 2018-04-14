@@ -670,7 +670,9 @@ class DQNAgent(Agent):
             self.memory.add(s, a, r, is_terminal)
             self.episode_losses.append(self.train_model())
             # End episode if necessary
-            if not self.env.is_running() or is_terminal:
+            if not self.env.is_running() or \
+                    is_terminal or \
+                    self.step_current == self.args.steps:
                 self.episode_cleanup()
                 if self.run_test:
                     self.epoch_cleanup()
@@ -684,7 +686,8 @@ class DQNAgent(Agent):
                 self.copy_model_parameters()
             # End epoch if necessary
             if self.step_current % \
-                    (self.args.backup_frequency * self.args.steps) == 0:
+                    (self.args.backup_frequency * self.args.steps) == 0 or \
+                    self.step_current == self.args.steps - 1:
                 self.run_test = True
             
                 

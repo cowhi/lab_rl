@@ -8,8 +8,9 @@ local helper = require 'lab_rl.helper'
 local pickups = require 'lab_rl.pickups'
 
 local timeout = require 'decorators.timeout'
-local maze_gen = require 'dmlab.system.maze_generation'
---local maze_gen = require 'lab_rl.map_maker'  -- Use when running first time?!
+--local maze_gen = require 'dmlab.system.maze_generation'
+local maze_gen = require 'lab_rl.map_maker'  -- Use when running first time?!
+
 
 --[[ Creates a map where all objects spawn at random locations after reloading the map.
 Keyword arguments:
@@ -25,7 +26,7 @@ function factory.createLevelApi(kwargs)
     local map_name = kwargs.mapName
     local map_data = require('lab_rl.'..map_name)
     --local maze = maze_gen.MazeGeneration{entity = map_data.entity}
-    --local maze = maze_gen.makeMap(map_name, map_data.entity, map_data.variation) -- see maze_gen require
+    local maze = maze_gen.makeMap(map_name, map_data.entity, map_data.variation) -- see maze_gen require
 
     local spawn_points = {}
 
@@ -40,6 +41,7 @@ function factory.createLevelApi(kwargs)
         api._finish_count = 0
         api._time_remaining = kwargs.episodeLengthSeconds
         random.seed(seed)
+
     end
 
     function api:updateSpawnVars(spawnVars)

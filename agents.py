@@ -369,6 +369,7 @@ class SimpleDQNAgent(Agent):
         self.saver = tf.train.Saver(max_to_keep=1000)
         if self.args.load_model is not None:
             self.saver.restore(self.session, self.args.load_model)
+            self.model_name = self.args.load_model.split("/")[-1]
         else:
             init = tf.global_variables_initializer()
             self.session.run(init)

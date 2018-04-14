@@ -166,10 +166,12 @@ def main():
             _logger.info("Finished")
     # Plot experiment
     if not args.play:
-        summarize_runs(target_path)
-        plot_experiment(target_path, 'stats_train', 'episode')
-        plot_experiment(target_path, 'stats_test', 'epoch')
+        if args.runs > 1:
+            summarize_runs(target_path)
+            plot_experiment(target_path, 'stats_train', 'episode')
+            plot_experiment(target_path, 'stats_test', 'epoch')
     # TODO: get best model
+    print('############# FINISHED ##############')
 
 
 if __name__ == "__main__" and __package__ is None:

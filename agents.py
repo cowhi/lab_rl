@@ -90,23 +90,46 @@ class Agent(object):
                              self.args.input_width,
                              self.args.input_height,
                              self.args.color_channels)
-        if self.exploration_method == "epsilon":
-            self.epsilons = self.generate_epsilons()
-            self.tau = self.args.tau_start
-        elif self.exploration_method == "tau":
-            self.taus = self.generate_taus()
-            self.epsilon = self.args.epsilon_start
-            #print(self.taus.shape)
+        # define learning parameter
+        self.epsilons = self.generate_epsilons()
+        self.taus = self.generate_taus()
+        # if self.exploration_method == "epsilon":
+        #    self.epsilons = self.generate_epsilons()
+        #    self.tau = self.args.tau_start
+        #elif self.exploration_method == "tau":
+        #    self.taus = self.generate_taus()
+        #    self.epsilon = self.args.epsilon_start
+        #    #print(self.taus.shape)
 
     def generate_epsilons(self):
-        epsilon_decline = np.linspace(
-                self.args.epsilon_start,
-                self.args.epsilon_min,
-                int(self.args.epsilon_decay * self.args.steps))
-        rest = self.args.epsilon_min * \
-                np.ones(self.args.steps - epsilon_decline.shape[0])
-        return np.append(epsilon_decline, rest)
-            
+        if self.exploration_method == "epsilon":
+            epsilon_decline = np.linspace(
+                    self.args.epsilon_start,
+                    self.args.epsilon_min,
+                    int(self.args.epsilon_decay * self.args.steps))
+            rest = self.args.epsilon_min * \
+                    np.ones(self.args.steps - epsilon_decline.shape[0])
+            return np.append(epsilon_decline, rest)
+        else:
+            return np.ones(self.args.steps)
+    
+    def generate_taus(self):
+        if self.exploration_method == "tau":
+            rate = ((self.args.tau_start/self.args.tau_min)**(1./(int(self.args.tau_decay*self.args.steps)))) - 1
+            taus = []
+            tau = self.args.tau_start
+            for i in range(int(self.args.tau_decay*self.args.steps)):
+                if tau > self.args.tau_min:
+                    taus.append(tau)
+                else:
+                    break
+                tau -= tau * rate
+            for i in range(self.args.steps - len(taus)):
+                taus.append(self.args.tau_min)
+            return np.array(taus)
+        else:
+            return np.ones(self.args.steps)
+    
     def prepare_csv_train(self):
         first_row = ('episode',
                      'time',
@@ -337,7 +360,7 @@ class Agent(object):
         if self.args.show:
             cv2.destroyAllWindows()
 
-
+'''
 class SimpleDQNAgent(Agent):
     def __init__(self, args, rng, env, paths):
         # Call super class
@@ -397,7 +420,7 @@ class SimpleDQNAgent(Agent):
             return self.model.train(s, qs)
         return 0.0
 
-    '''
+    """
     def update_epsilon(self, steps):
         # Update epsilon if necessary
         if steps > self.args.epsilon_decay * self.args.steps:
@@ -412,7 +435,7 @@ class SimpleDQNAgent(Agent):
         if self.tau <= self.args.tau_min:
             return self.args.tau_min
         return self.tau - self.tau * self.args.tau_decay
-    '''
+    """
     
     def generate_taus(self):
         rate = ((self.args.tau_start/self.args.tau_min)**(1./(int(self.args.tau_decay*self.args.steps)))) - 1
@@ -459,7 +482,7 @@ class SimpleDQNAgent(Agent):
                 if not self.step_current == self.args.steps:
                     print("TRAINING")
                     self.episode_reset()
-
+'''
 
 class RandomAgent(Agent):
     """Simple random agent for DeepMind Lab."""
@@ -499,6 +522,185 @@ class DQNAgent(Agent):
         super(DQNAgent, self).__init__(args, rng, env, paths)
         print('Starting DQN agent.')
 
+        # Check if no session is active
+        # variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='policy')
+        if len(tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)) > 0:
+            # print(len(variables), '#####  BEFORE RESETING  ####################################')
+            # print('\n'.join([ str(variable) for variable in variables ]))
+            tf.reset_default_graph()
+            # tf.get_variable_scope().reuse_variables()
+            self.session = None
+            # variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='policy')
+            # print(len(variables), '#####  AFTER RESETING  #####################################')
+            # print('\n'.join([ str(variable) for variable in variables ]))
+            # print('############################################################')
+        
+        # Prepare model
+        tf.set_random_seed(self.args.random_seed)
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = True
+        config.log_device_placement = False
+        config.allow_soft_placement = True
+
+        # Initiate tensorflow session
+        self.session = tf.Session(config=config)
+        
+        # self.model_input_shape = (self.args.input_width,
+        #                          self.args.input_height) + \
+        #                         (self.args.color_channels,)
+        # print("Old:", self.model_input_shape)
+        self.model_input_shape = (self.args.sequence_length,) + \
+                                 (self.args.input_width, self.args.input_height) + \
+                                 (self.args.color_channels,)
+        self.observation_shape = (self.args.input_width,
+                                  self.args.input_height) + \
+                                 (self.args.color_channels,)
+        # Replay memory
+        self.memory = SimpleReplayMemory(self.args,
+                                         self.rng,
+                                         self.model_input_shape)
+        # Policy network
+        self.model = SimpleDQNModel(self.args,
+                                    self.rng,
+                                    self.session,
+                                    self.model_input_shape,
+                                    self.available_actions,
+                                    self.paths['model_path'],
+                                    'policy')
+        # Target network
+        self.target_model = SimpleDQNModel(self.args,
+                                           self.rng,
+                                           self.session,
+                                           self.model_input_shape,
+                                           self.available_actions,
+                                           self.paths['model_path'],
+                                           'target')
+        
+        self.saver = tf.train.Saver(
+                var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES,
+                                           scope='policy'))
+        if self.args.load_model is not None:
+            self.saver.restore(self.session, self.args.load_model)
+            self.model_name = self.args.load_model.split("/")[-1]
+        else:
+            # variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
+            # print(len(variables), '#####  BEFORE INIT  #####################################')
+            # print('\n'.join([ str(variable) for variable in variables ]))
+            # print('############################################################')
+            init = tf.global_variables_initializer()
+            self.session.run(init)
+        # We want to have two similar networks
+        self.copy_model_parameters(self.model.scope, self.target_model.scope)
+        # if not self.args.play:
+        #    # Backup initial model weights
+        #    self.model_name = "DQN_epoch_0000"
+        #    self.model_last = os.path.join(self.paths['model_path'],
+        #                                   self.model_name)
+        #    self.saver.save(self.session, self.model_last)
+
+    def train_model(self):
+        # train model with random batch from memory
+        # if self.step_current % int((1/5)*self.args.steps) == 0:
+        #    self.batch_size *= 2
+        # TODO: add dynamics (combine 4 observations to one state)
+        if self.memory.size > 2 * self.batch_size:
+            s, a, r, s_prime, is_terminal = self.memory.get_batch()
+            # values from current policy
+            qs = self.model.get_qs(s)
+            # print('Qs', qs[0])
+            # TODO: values from target network!
+            # max_qs = np.max(self.model.get_qs(s_prime), axis=1)
+            max_qs = np.max(self.target_model.get_qs(s_prime), axis=1)
+            # print('a', a[0], 'r', r[0], 'gamma',
+            #       self.args.gamma, 'q_s_prime', max_qs[0])
+            qs[np.arange(qs.shape[0]), a] = r + (1 - is_terminal) * (
+                    self.args.gamma * max_qs)
+            # print('Qs_updated', qs[0])
+            # Training of current policy!
+            return self.model.train(s, qs)
+        return 0.0
+
+    def copy_model_parameters(self, source, target):
+        """ Copies the trainable network parameters from the
+            current policy network to the target network
+        """
+        policy_params = [t for t in tf.trainable_variables()
+                         if t.name.startswith(source)]
+        policy_params = sorted(policy_params, key=lambda v: v.name)
+        target_params = [t for t in tf.trainable_variables()
+                         if t.name.startswith(target)]
+        target_params = sorted(target_params, key=lambda v: v.name)
+
+        update_ops = []
+        for policy_v, target_v in zip(policy_params, target_params):
+            op = target_v.assign(policy_v)
+            update_ops.append(op)
+
+        self.session.run(update_ops)
+    
+    def get_action(self, state):
+        """ Returns an action selected through softmax. """
+        # TODO: Get actions from model
+        if self.exploration_method == "tau":
+            # print(self.step_current, self.tau, self.batch_size)
+            return self.rng.choice(self.available_actions,
+                                   p=get_softmax(self.model.get_qs(state),
+                                                 self.tau))
+        if self.exploration_method == "epsilon":
+            if self.rng.random_sample() < self.epsilon:
+                # select random action
+                return self.rng.choice(self.available_actions)
+            else:
+                # if not random choose action with highest Q-value
+                return np.argmax(self.model.get_qs(state)) 
+
+    def train(self):
+        self.epoch_cleanup()
+        self.epoch_reset()
+        print("TRAINING")
+        self.episode_reset()
+        self.run_test = False
+        for self.step_current in range(1, self.args.steps+1):
+            self.step_episode += 1
+            # self.tau = self.update_tau()
+            # print(self.step_current)
+            if self.exploration_method == "tau":
+                self.tau = self.taus[self.step_current-1]
+            elif self.exploration_method == "epsilon":
+                self.epsilon = self.epsilons[self.step_current-1]
+            s, a, r, is_terminal = self.step()
+            self.episode_reward += r
+            self.memory.add(s, a, r, is_terminal)
+            self.episode_losses.append(self.train_model())
+            # End episode if necessary
+            if not self.env.is_running() or \
+                    is_terminal or \
+                    self.step_current == self.args.steps:
+                self.episode_cleanup()
+                if self.run_test:
+                    self.epoch_cleanup()
+                    self.epoch_reset()
+                    self.run_test = False
+                    if not self.step_current == self.args.steps:
+                        print("TRAINING")
+                self.episode_reset()
+            # Copy network weights from time to time
+            if self.step_current % self.args.target_update_frequency == 0:
+                self.copy_model_parameters(self.model.scope, self.target_model.scope)
+            # End epoch if necessary
+            if self.step_current % \
+                    (self.args.backup_frequency * self.args.steps) == 0 or \
+                    self.step_current == self.args.steps - 1:
+                self.run_test = True
+        self.session.close()
+            
+
+class ADAAPTAgent(Agent):
+    def __init__(self, args, rng, env, paths):
+        # Call super class
+        super(ADAAPTAgent, self).__init__(args, rng, env, paths)
+        print('Starting ADAAPT agent.')
+
         # Prepare model
         tf.set_random_seed(self.args.random_seed)
         config = tf.ConfigProto()
@@ -518,6 +720,10 @@ class DQNAgent(Agent):
         self.observation_shape = (self.args.input_width,
                                   self.args.input_height) + \
                                  (self.args.color_channels,)
+        # Replay memory
+        self.memory = SimpleReplayMemory(self.args,
+                                         self.rng,
+                                         self.model_input_shape)
         # Policy network
         self.model = SimpleDQNModel(self.args,
                                     self.rng,
@@ -534,11 +740,7 @@ class DQNAgent(Agent):
                                            self.available_actions,
                                            self.paths['model_path'],
                                            'target')
-
-        self.memory = SimpleReplayMemory(self.args,
-                                         self.rng,
-                                         self.model_input_shape)
-
+        
         self.saver = tf.train.Saver(max_to_keep=1000)
         if self.args.load_model is not None:
             self.saver.restore(self.session, self.args.load_model)
@@ -594,26 +796,7 @@ class DQNAgent(Agent):
             update_ops.append(op)
 
         self.session.run(update_ops)
-    
-    '''
-    def update_epsilon(self, steps):
-        # Update epsilon if necessary
-        # TODO: check this
-        if steps > self.args.epsilon_decay * self.args.steps:
-            return self.args.epsilon_min
-        return self.args.epsilon_start - \
-               steps * (self.args.epsilon_start - self.args.epsilon_min) / \
-               (self.args.epsilon_decay * self.args.steps)    
-    '''
-    
-    '''
-    def update_tau(self):
-        # Update tau if necessary
-        if self.tau <= self.args.tau_min:
-            return self.args.tau_min
-        return self.tau - self.tau * self.args.tau_decay
-    '''
-    
+
     def generate_taus(self):
         rate = ((self.args.tau_start/self.args.tau_min)**(1./(int(self.args.tau_decay*self.args.steps)))) - 1
         taus = []
@@ -690,6 +873,5 @@ class DQNAgent(Agent):
             if self.step_current % \
                     (self.args.backup_frequency * self.args.steps) == 0 or \
                     self.step_current == self.args.steps - 1:
-                self.run_test = True
-            
+                self.run_test = True                
                 

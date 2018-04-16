@@ -641,11 +641,6 @@ class DQNAgent(Agent):
     def get_action(self, state):
         """ Returns an action selected through softmax. """
         # TODO: Get actions from model
-        if self.exploration_method == "tau":
-            # print(self.step_current, self.tau, self.batch_size)
-            return self.rng.choice(self.available_actions,
-                                   p=get_softmax(self.model.get_qs(state),
-                                                 self.tau))
         if self.exploration_method == "epsilon":
             if self.rng.random_sample() < self.epsilon:
                 # select random action
@@ -653,6 +648,11 @@ class DQNAgent(Agent):
             else:
                 # if not random choose action with highest Q-value
                 return np.argmax(self.model.get_qs(state)) 
+        if self.exploration_method == "tau":
+            # print(self.step_current, self.tau, self.batch_size)
+            return self.rng.choice(self.available_actions,
+                                   p=get_softmax(self.model.get_qs(state),
+                                                 self.tau))
 
     def train(self):
         self.epoch_cleanup()
@@ -664,10 +664,12 @@ class DQNAgent(Agent):
             self.step_episode += 1
             # self.tau = self.update_tau()
             # print(self.step_current)
-            if self.exploration_method == "tau":
-                self.tau = self.taus[self.step_current-1]
-            elif self.exploration_method == "epsilon":
-                self.epsilon = self.epsilons[self.step_current-1]
+            # if self.exploration_method == "tau":
+            #    self.tau = self.taus[self.step_current-1]
+            # elif self.exploration_method == "epsilon":
+            #    self.epsilon = self.epsilons[self.step_current-1]
+            self.tau = self.taus[self.step_current-1]
+            self.epsilon = self.epsilons[self.step_current-1]
             s, a, r, is_terminal = self.step()
             self.episode_reward += r
             self.memory.add(s, a, r, is_terminal)

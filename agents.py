@@ -698,11 +698,25 @@ class DQNAgent(Agent):
             
 
 class ADAAPTAgent(Agent):
+    """ This is static for max 3 sources. """
     def __init__(self, args, rng, env, paths):
         # Call super class
         super(ADAAPTAgent, self).__init__(args, rng, env, paths)
         print('Starting ADAAPT agent.')
 
+        # Check if no session is active
+        # variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='policy')
+        if len(tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)) > 0:
+            # print(len(variables), '#####  BEFORE RESETING  ####################################')
+            # print('\n'.join([ str(variable) for variable in variables ]))
+            tf.reset_default_graph()
+            # tf.get_variable_scope().reuse_variables()
+            self.session = None
+            # variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='policy')
+            # print(len(variables), '#####  AFTER RESETING  #####################################')
+            # print('\n'.join([ str(variable) for variable in variables ]))
+            # print('############################################################')
+        
         # Prepare model
         tf.set_random_seed(self.args.random_seed)
         config = tf.ConfigProto()
@@ -726,38 +740,82 @@ class ADAAPTAgent(Agent):
         self.memory = SimpleReplayMemory(self.args,
                                          self.rng,
                                          self.model_input_shape)
-        # Policy network
-        self.model = SimpleDQNModel(self.args,
-                                    self.rng,
-                                    self.session,
-                                    self.model_input_shape,
-                                    self.available_actions,
-                                    self.paths['model_path'],
-                                    'policy')
-        # Target network
-        self.target_model = SimpleDQNModel(self.args,
-                                           self.rng,
-                                           self.session,
-                                           self.model_input_shape,
-                                           self.available_actions,
-                                           self.paths['model_path'],
-                                           'target')
         
-        self.saver = tf.train.Saver(max_to_keep=1000)
+        # Policy network
+        self.model = SimpleDQNModel(
+            self.args,
+            self.rng,
+            self.session,
+            self.model_input_shape,
+            self.available_actions,
+            self.paths['model_path'],
+            'policy')
+        # Target network
+        self.target_model = SimpleDQNModel(
+            self.args,
+            self.rng,
+            self.session,
+            self.model_input_shape,
+            self.available_actions,
+            self.paths['model_path'],
+            'target')
+        
+        self.saver = tf.train.Saver(
+                var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES,
+                                           scope='policy'))
+        
+        self.args.load_source1 = '/home/ruben/.lab/2018-04-16_14-13_task_3a_adaapt/run_00/models/DQN_epoch_0000'
+        self.args.load_source2 = '/home/ruben/.lab/2018-04-16_14-13_task_3a_adaapt/run_00/models/DQN_epoch_0001'
+        self.args.load_source3 = '/home/ruben/.lab/2018-04-16_14-13_task_3a_adaapt/run_00/models/DQN_epoch_0002'
+        # Load source models first if available
+        self.count_source_models = 0
+        self.source_models = {}
+        sources = [self.args.load_source1, self.args.load_source2, self.args.load_source3]
+        for source in sources:
+            if source is not None:
+                self.count_source_models += 1
+                # Load source
+                self.saver.restore(self.session, source)
+                # Build source network
+                self.source_models["source_" + str(self.count_source_models)] = SimpleDQNModel(
+                    self.args,
+                    self.rng,
+                    self.session,
+                    self.model_input_shape,
+                    self.available_actions,
+                    self.paths['model_path'],
+                    'source' + str(self.count_source_models))
+                # Copy model parameter to source model
+                self.copy_model_parameters('policy', 'source' + str(self.count_source_models))
+        
+        # Importance network
+        self.importance_model = SimpleDQNModel(
+            self.args,
+            self.rng,
+            self.session,
+            self.model_input_shape,
+            len(self.source_models) + 1,
+            self.paths['model_path'],
+            'importance')
+        
         if self.args.load_model is not None:
             self.saver.restore(self.session, self.args.load_model)
             self.model_name = self.args.load_model.split("/")[-1]
         else:
+            # variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
+            # print(len(variables), '#####  BEFORE INIT  #####################################')
+            # print('\n'.join([ str(variable) for variable in variables ]))
+            # print('############################################################')
             init = tf.global_variables_initializer()
             self.session.run(init)
         # We want to have two similar networks
-        self.copy_model_parameters()
-        if not self.args.play:
-            # Backup initial model weights
-            self.model_name = "DQN_0000"
-            self.model_last = os.path.join(self.paths['model_path'],
-                                           self.model_name)
-            self.saver.save(self.session, self.model_last)
+        self.copy_model_parameters(self.model.scope, self.target_model.scope)
+        # if not self.args.play:
+        #    # Backup initial model weights
+        #    self.model_name = "DQN_epoch_0000"
+        #    self.model_last = os.path.join(self.paths['model_path'],
+        #                                   self.model_name)
+        #    self.saver.save(self.session, self.model_last)
 
     def train_model(self):
         # train model with random batch from memory
@@ -767,7 +825,7 @@ class ADAAPTAgent(Agent):
         if self.memory.size > 2 * self.batch_size:
             s, a, r, s_prime, is_terminal = self.memory.get_batch()
             # values from current policy
-            qs = self.model.get_qs(s)
+            qs = self.get_weighted_qs(s)
             # print('Qs', qs[0])
             # TODO: values from target network!
             # max_qs = np.max(self.model.get_qs(s_prime), axis=1)
@@ -780,16 +838,29 @@ class ADAAPTAgent(Agent):
             # Training of current policy!
             return self.model.train(s, qs)
         return 0.0
+    
+    def get_weighted_qs(self, s):
+        # Get importance vector from imporance network
+        importance = self.importance_model.get_action_probs(s)
+        print(importance)
+        # TODO: Get q values from each network
+        qs = {}
+        qs[0] = self.model.get_qs(s)
+        for i in range(1, len(self.source_models)+1):
+            qs[i] = self.source_models.get_qs(s)
+        # TODO: Calculate weighted Q values
+        weighted_qs = qs
+        return weighted_qs
 
-    def copy_model_parameters(self):
+    def copy_model_parameters(self, source, target):
         """ Copies the trainable network parameters from the
             current policy network to the target network
         """
         policy_params = [t for t in tf.trainable_variables()
-                         if t.name.startswith(self.model.scope)]
+                         if t.name.startswith(source)]
         policy_params = sorted(policy_params, key=lambda v: v.name)
         target_params = [t for t in tf.trainable_variables()
-                         if t.name.startswith(self.target_model.scope)]
+                         if t.name.startswith(target)]
         target_params = sorted(target_params, key=lambda v: v.name)
 
         update_ops = []
@@ -798,45 +869,26 @@ class ADAAPTAgent(Agent):
             update_ops.append(op)
 
         self.session.run(update_ops)
-
-    def generate_taus(self):
-        rate = ((self.args.tau_start/self.args.tau_min)**(1./(int(self.args.tau_decay*self.args.steps)))) - 1
-        taus = []
-        tau = self.args.tau_start
-        for i in range(int(self.args.tau_decay*self.args.steps)):
-            if tau > self.args.tau_min:
-                taus.append(tau)
-            else:
-                break
-            tau -= tau * rate
-        for i in range(self.args.steps - len(taus)):
-            taus.append(self.args.tau_min)
-        return np.array(taus)
-
-    
-    
-    
-    
     
     def get_action(self, state):
         """ Returns an action selected through softmax. """
+        # TODO: Get output from importance network
+        # TODO: get all qs from source and policy
+        # TODO: Calculate weighted q values
+        # TODO: Perform argmax
         # TODO: Get actions from model
-        if self.exploration_method == "tau":
-            # print(self.step_current, self.tau, self.batch_size)
-            return self.rng.choice(self.available_actions,
-                                   p=get_softmax(self.model.get_qs(state),
-                                                 self.tau))
         if self.exploration_method == "epsilon":
             if self.rng.random_sample() < self.epsilon:
                 # select random action
                 return self.rng.choice(self.available_actions)
             else:
                 # if not random choose action with highest Q-value
-                return np.argmax(self.model.get_qs(state))
-            
-            
-            
-            
+                return np.argmax(self.model.get_qs(state)) 
+        if self.exploration_method == "tau":
+            # print(self.step_current, self.tau, self.batch_size)
+            return self.rng.choice(self.available_actions,
+                                   p=get_softmax(self.model.get_qs(state),
+                                                 self.tau))
 
     def train(self):
         self.epoch_cleanup()
@@ -848,10 +900,12 @@ class ADAAPTAgent(Agent):
             self.step_episode += 1
             # self.tau = self.update_tau()
             # print(self.step_current)
-            if self.exploration_method == "tau":
-                self.tau = self.taus[self.step_current-1]
-            elif self.exploration_method == "epsilon":
-                self.epsilon = self.epsilons[self.step_current-1]
+            # if self.exploration_method == "tau":
+            #    self.tau = self.taus[self.step_current-1]
+            # elif self.exploration_method == "epsilon":
+            #    self.epsilon = self.epsilons[self.step_current-1]
+            self.tau = self.taus[self.step_current-1]
+            self.epsilon = self.epsilons[self.step_current-1]
             s, a, r, is_terminal = self.step()
             self.episode_reward += r
             self.memory.add(s, a, r, is_terminal)
@@ -870,10 +924,10 @@ class ADAAPTAgent(Agent):
                 self.episode_reset()
             # Copy network weights from time to time
             if self.step_current % self.args.target_update_frequency == 0:
-                self.copy_model_parameters()
+                self.copy_model_parameters(self.model.scope, self.target_model.scope)
             # End epoch if necessary
             if self.step_current % \
                     (self.args.backup_frequency * self.args.steps) == 0 or \
                     self.step_current == self.args.steps - 1:
-                self.run_test = True                
-                
+                self.run_test = True
+        self.session.close()

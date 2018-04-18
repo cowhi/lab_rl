@@ -51,6 +51,9 @@ class Experiment(object):
         elif self.args.agent == 'DummyAgent':
             from lab_rl.agents import DummyAgent
             self.agent = DummyAgent(self.args, self.rng, self.env, self.paths)
+        elif self.args.agent == 'ADAAPT':
+            from lab_rl.agents import ADAAPTAgent
+            self.agent = ADAAPTAgent(self.args, self.rng, self.env, self.paths)
         else:
             print('No agent:', self.args.agent)
             sys.exit(1)

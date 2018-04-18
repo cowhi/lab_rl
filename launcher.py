@@ -103,6 +103,13 @@ def parse_args():
     model_args.add_argument('--target_update_frequency', type=int,
                             default=10000,
                             help='Update frequency of the target network.')
+    model_args.add_argument('--load_source1', type=str, default=None,
+                            help='The path to a source model to load for the agent.')
+    model_args.add_argument('--load_source2', type=str, default=None,
+                            help='The path to a source model to load for the agent.')
+    model_args.add_argument('--load_source3', type=str, default=None,
+                            help='The path to a source model to load for the agent.')
+    
     
 
     memory_args = parser.add_argument_group('Memory')

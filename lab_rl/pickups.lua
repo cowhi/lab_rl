@@ -37,14 +37,14 @@ pickups.defaults = {
         name = 'Strawberry',
         class_name = 'strawberry_reward',
         model_name = 'models/strawberry.md3',
-        quantity = 4,
+        quantity = 2,
         type = pickups.type.kReward
     },
     fungi_reward = {
         name = 'Fungi',
         class_name = 'fungi_reward',
         model_name = 'models/toadstool.md3',
-        quantity = -4,
+        quantity = -2,
         type = pickups.type.kReward
     },
     goal = {

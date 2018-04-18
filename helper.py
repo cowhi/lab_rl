@@ -149,6 +149,45 @@ def plot_experiment(path_to_dir, file_name, search):
                     bbox_inches='tight')
         plt.close('all')
 
+        
+def plot_nice(path_to_dir, file_name, min_value, max_value, goal):
+    # define important parameters
+    column = 'reward_mean'
+    search = 'epoch'
+    #params = {"ytick.color" : "w",
+    #      "xtick.color" : "w",
+    #      "axes.labelcolor" : "w",
+    #      "axes.edgecolor" : "w"}
+    # get data
+    df = pd.read_csv(os.path.join(path_to_dir, file_name + '.csv'))
+    # transform to percentage of reward range
+    diff = max_value - min_value
+    values = 100*(df[column]-min_value)/diff
+    # get first epoch above goal
+    reached = (values.values > goal).argmax()
+    
+    plt.rcParams.update(params)
+    fig = plt.figure(figsize=(10, 4), dpi=80)
+    ax = fig.add_subplot(111)
+    #fig, ax = plt.subplots()
+    ax.plot(df[search], values,
+             label=column, color='blue', linewidth=2.0)
+    ax.axhline(y=goal, linewidth=1.0, color='r', linestyle='-',
+               label='Goal (y='+str(goal)+'%)')
+    ax.axvline(x=reached, linewidth=1.0, color='black', linestyle='--',
+               label='Goal reached (Epoch '+str(reached)+')')
+    ax.set(xlabel=search, ylabel=column+' (% of reward range)',
+           title='Mean reward over 3 runs')
+    ax.set_ylim([0,100])
+    ax.grid()
+    ax.legend()
+    plt.savefig(
+        os.path.join(path_to_dir, 'plots',
+                     str(file_name) + '_' + str(column) + '.png'),
+        bbox_inches='tight')
+    #plt.show()
+    plt.close('all')
+
 
 def get_human_readable(size, precision=2):
     suffixes = ['B', 'KB', 'MB', 'GB', 'TB']

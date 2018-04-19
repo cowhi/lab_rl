@@ -3,6 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 import argparse
+import git
 import glob
 import logging
 import os
@@ -38,6 +39,8 @@ def parse_args():
                                  help='Frequency of model backups: backup_frequency * steps.')
     experiment_args.add_argument("--random_seed", type=int, default=123,
                                  help="Random seed for reproducible experiments.")
+    experiment_args.add_argument('--repo_path', type=str, default=None,
+                                  help='Set this to log repo and used commit.')
 
 
     environment_args = parser.add_argument_group('Environment')
@@ -135,8 +138,15 @@ def make_path_structure(path_to_dir):
 
 
 def main():
+    print('############# START ##############')
     # get commandline arguments
     args = parse_args()
+    repo_info = {}
+    if not args.repo_path == None:
+        repo = git.Repo(path=args.repo_path)
+        repo_info['url'] = repo.remotes.origin.url
+        repo_info['commit'] = repo.head.commit.hexsha
+    
     script = os.path.split(args.level_script.lower())
     level = re.sub('\_run$', '', script[-1])
 
@@ -148,8 +158,10 @@ def main():
     target_path = create_dir(os.path.join(os.path.expanduser("~"), ".lab", new_dir))
     plot_path = create_dir(os.path.join(target_path, 'plots'))
     # save arguments as a text file
-    dump_args(target_path, args)
-
+    print(type(vars(args)), type(repo_info))
+    dump_args(target_path, vars(args))
+    dump_args(target_path, repo_info, 'repo.txt')
+    
     for run in range(args.runs):
         print('###  RUN {num:02d}  #############################'.format(num=run))
         paths = {

@@ -70,13 +70,12 @@ def delete_dir(path_to_dir):
         sys.exit(1)
 
 
-def dump_args(log_path, args):
+def dump_args(log_path, args, target='args_dump.txt'):
     _logger = logging.getLogger(__name__)
     try:
-        args_dump = open(os.path.join(log_path, 'args_dump.txt'), 'w', 0)
-        args_dict = vars(args)
-        for key in sorted(args_dict):
-            args_dump.write("%s=%s\n" % (str(key), str(args_dict[key])))
+        args_dump = open(os.path.join(log_path, target), 'w', 0)
+        for key in sorted(args):
+            args_dump.write("%s=%s\n" % (str(key), str(args[key])))
         args_dump.flush()
         args_dump.close()
     except Exception as e:

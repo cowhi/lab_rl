@@ -3,6 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 import argparse
+import glob
 import logging
 import os
 import re
@@ -182,6 +183,9 @@ def main():
             plot_experiment(target_path, 'stats_train', 'episode')
             plot_experiment(target_path, 'stats_test', 'epoch')
     # TODO: get best model
+    print('############# FINISHED ##############')
+    print('Find stats here:', target_path)
+    print('Find log here:', sorted(glob.glob(os.path.expanduser("~") + "/lab_log*"))[-1])
     print('############# FINISHED ##############')
 
 

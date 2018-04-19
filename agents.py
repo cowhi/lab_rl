@@ -58,6 +58,8 @@ class Agent(object):
         self.step_episode = 0  # steps per episode
         self.total_reward = 0  # total reward so far
         self.test_reward_best = 0  # best avg reward after epochs
+        self.goal_reached = 0  # only 1 if goal is reached in an episode
+        self.total_goals_reached = 0  # all goals reached during training
 
         # Prepare training logs (written after every episode)
         self.csv_train_file = None
@@ -141,7 +143,9 @@ class Agent(object):
                      'tau',
                      'epsilon',
                      'loss',
-                     'batch_size')
+                     'batch_size',
+                     'goal',
+                     'goals_total')
         self.csv_train_file = open(
                 os.path.join(self.paths['log_path'], 'stats_train.csv'), "wb")
         self.csv_train_writer = csv.writer(self.csv_train_file)
@@ -158,7 +162,8 @@ class Agent(object):
                      'steps',
                      'episodes',
                      'reward_avg',
-                     'steps_avg')
+                     'steps_avg',
+                     'goals_avg')
         self.csv_test_file = open(
                 os.path.join(self.paths['log_path'], 'stats_test.csv'), "wb")
         self.csv_test_writer = csv.writer(self.csv_test_file)
@@ -188,6 +193,7 @@ class Agent(object):
         a = self.get_action(s[None, ...])
         r = self.env.step(a)
         is_terminal = not self.env.is_running() or r % 2 == 1
+        self.goal_reached = 1 if r % 2 == 1 else 0
         return s, a, r - self.step_penalty, is_terminal
 
     def episode_reset(self):
@@ -195,6 +201,7 @@ class Agent(object):
         # print('Episode', self.episode, 'START')
         self.episode_reward = 0
         self.step_episode = 0
+        self.goal_reached = 0
         self.episode_losses = []
         self.env.reset()
         self.episode_start_time = time.time()
@@ -203,11 +210,13 @@ class Agent(object):
         # print('Episode', self.episode, 'END')
         self.epoch_rewards.append(self.episode_reward)
         self.total_reward += self.episode_reward
+        self.total_goals_reached += self.goal_reached
         # TODO: Figure out why len(self.episode_losses) is sometimes 0 
         if not len(self.episode_losses) == 0:
             self.loss = sum(self.episode_losses)/len(self.episode_losses)
         else:
             self.loss = 0.0
+        
         new_row = (self.episode,  # current episode
                    "{0:.1f}".format(time.time() - self.start_time),
                    # total time
@@ -220,7 +229,9 @@ class Agent(object):
                    "{0:.4f}".format(self.tau),  # current tau
                    "{0:.5f}".format(self.epsilon),  # current epsilon
                    "{0:.4f}".format(self.loss),  # avg loss per batch
-                   self.batch_size  # current batch size used for training
+                   self.batch_size,  # current batch size used for training
+                   self.goal_reached,  # 1 if goal was actually reached
+                   self.total_goals_reached  # count of all goals reached so far
                    )
         # print(new_row)
         # print('Train Episode', self.episode,
@@ -232,6 +243,7 @@ class Agent(object):
     def epoch_reset(self):
         self.epoch += 1
         self.epoch_rewards = []
+        self.epoch_goals = []
         self.epoch_start_time = time.time()
 
     def epoch_cleanup(self):
@@ -240,7 +252,7 @@ class Agent(object):
                         self.args.steps,
                         self.epoch_rewards,
                         time.time() - self.start_time)
-        test_reward, test_steps = self.test(self.args.test_episodes)
+        test_reward, test_steps, test_goals = self.test(self.args.test_episodes)
 
         new_row = (self.epoch,  # current epoch
                    "{0:.1f}".format(time.time() - self.start_time),
@@ -251,8 +263,10 @@ class Agent(object):
                    self.episode,  # total episodes so far
                    "{0:.4f}".format(test_reward),
                    # avg reward per episode during testing
-                   "{0:.4f}".format(test_steps)
+                   "{0:.4f}".format(test_steps),
                    # avg steps per episode during testing
+                   "{0:.4f}".format(test_goals),
+                   # avg goals reached per episode during testing
                    )
         # if self.test_reward_best <= test_reward:
         # self.test_reward_best = test_reward
@@ -285,6 +299,7 @@ class Agent(object):
         print('TESTING')
         episode_rewards = []
         episode_steps = []
+        episode_goals = []
         for episode in range(0, episodes):
             save_video = False
             # self.bla = episode
@@ -292,8 +307,10 @@ class Agent(object):
                 save_video = True
             # print('Test episode %i' % episode)
             reward, steps = self.play(save_video)
+            goal = 1 if reward % 2 == 1 else 0
             episode_rewards.append(reward)
             episode_steps.append(steps)
+            episode_goals.append(goal)
         print_stats(sum(episode_steps),
                     sum(episode_steps),
                     episode_rewards,
@@ -303,7 +320,7 @@ class Agent(object):
         elif self.exploration_method == "epsilon":
             self.epsilon = backup_epsilon
         
-        return sum(episode_rewards)/episodes, sum(episode_steps)/episodes
+        return sum(episode_rewards)/episodes, sum(episode_steps)/episodes, sum(episode_goals)/episodes
 
     def play(self, save_video, num_episodes=1):
         # print('Test Episode', self.bla)

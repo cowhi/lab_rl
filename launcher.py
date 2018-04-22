@@ -158,7 +158,7 @@ def main():
     target_path = create_dir(os.path.join(os.path.expanduser("~"), ".lab", new_dir))
     plot_path = create_dir(os.path.join(target_path, 'plots'))
     # save arguments as a text file
-    print(type(vars(args)), type(repo_info))
+    #print(type(vars(args)), type(repo_info))
     dump_args(target_path, vars(args))
     dump_args(target_path, repo_info, 'repo.txt')
     

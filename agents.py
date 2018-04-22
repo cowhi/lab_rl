@@ -814,6 +814,15 @@ class ADAAPTAgent(Agent):
             len(self.source_models) + 1,
             self.paths['model_path'],
             'importance')
+        # Importance network
+        self.target_importance_model = SimpleDQNModel(
+            self.args,
+            self.rng,
+            self.session,
+            self.model_input_shape,
+            len(self.source_models) + 1,
+            self.paths['model_path'],
+            'importance_target')
         
         if self.args.load_model is not None:
             self.saver.restore(self.session, self.args.load_model)
@@ -827,6 +836,7 @@ class ADAAPTAgent(Agent):
             self.session.run(init)
         # We want to have two similar networks
         self.copy_model_parameters(self.model.scope, self.target_model.scope)
+        self.copy_model_parameters(self.importance_model.scope, self.target_importance_model.scope)
         # if not self.args.play:
         #    # Backup initial model weights
         #    self.model_name = "DQN_epoch_0000"
@@ -834,7 +844,7 @@ class ADAAPTAgent(Agent):
         #                                   self.model_name)
         #    self.saver.save(self.session, self.model_last)
 
-    def train_model(self):
+    def train_model(self, target):
         # train model with random batch from memory
         # if self.step_current % int((1/5)*self.args.steps) == 0:
         #    self.batch_size *= 2
@@ -842,6 +852,7 @@ class ADAAPTAgent(Agent):
         if self.memory.size > 2 * self.batch_size:
             s, a, r, s_prime, is_terminal = self.memory.get_batch()
             # values from current policy
+            qs_policy
             qs = self.get_weighted_qs(s)
             # print('Qs', qs[0])
             # TODO: values from target network!
@@ -864,7 +875,7 @@ class ADAAPTAgent(Agent):
         qs = {}
         qs[0] = self.model.get_qs(s)
         for i in range(1, len(self.source_models)+1):
-            qs[i] = self.source_models.get_qs(s)
+            qs[i] = self.source_models[i].get_qs(s)
         # TODO: Calculate weighted Q values
         weighted_qs = qs
         return weighted_qs

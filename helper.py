@@ -149,10 +149,10 @@ def plot_experiment(path_to_dir, file_name, search):
         plt.close('all')
 
         
-def plot_nice(path_to_dir, file_name, min_value, max_value, goal):
+def plot_nice(path_to_dir, file_name, interest='reward_mean', row='epoch',
+              min_value=0, max_value=3, goal=80., window=7):
     # define important parameters
-    column = 'reward_mean'
-    search = 'epoch'
+    #search = 'epoch'
     #params = {"ytick.color" : "w",
     #      "xtick.color" : "w",
     #      "axes.labelcolor" : "w",
@@ -161,28 +161,30 @@ def plot_nice(path_to_dir, file_name, min_value, max_value, goal):
     df = pd.read_csv(os.path.join(path_to_dir, file_name + '.csv'))
     # transform to percentage of reward range
     diff = max_value - min_value
-    values = 100*(df[column]-min_value)/diff
-    # get first epoch above goal
+    values = 100*(df[interest]-min_value)/diff
+    # pandas voodoo for rolling averages for a smoother curve
+    values = values.rolling(window=window, center=True).mean()
+    # get epoch where running average is above goal
     reached = (values.values > goal).argmax()
     
-    plt.rcParams.update(params)
+    #plt.rcParams.update(params)
     fig = plt.figure(figsize=(10, 4), dpi=80)
     ax = fig.add_subplot(111)
     #fig, ax = plt.subplots()
-    ax.plot(df[search], values,
-             label=column, color='blue', linewidth=2.0)
+    ax.plot(df[row], values,
+             label=interest, color='blue', linewidth=2.0)
     ax.axhline(y=goal, linewidth=1.0, color='r', linestyle='-',
                label='Goal (y='+str(goal)+'%)')
     ax.axvline(x=reached, linewidth=1.0, color='black', linestyle='--',
                label='Goal reached (Epoch '+str(reached)+')')
-    ax.set(xlabel=search, ylabel=column+' (% of reward range)',
-           title='Mean reward over 3 runs')
+    ax.set(xlabel=row, ylabel=interest+' (% of range)',
+           title='Mean values over 3 runs and running average over ' + window + ' values')
     ax.set_ylim([0,100])
     ax.grid()
     ax.legend()
     plt.savefig(
         os.path.join(path_to_dir, 'plots',
-                     str(file_name) + '_' + str(column) + '.png'),
+                     str(file_name) + '_' + str(interest) + '.png'),
         bbox_inches='tight')
     #plt.show()
     plt.close('all')

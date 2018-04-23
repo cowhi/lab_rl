@@ -1,0 +1,6 @@
+model_checkpoint_path: "/home/ruben/.lab/2018-04-19_10-54_task_3a_dqnagent/run_00/models/DQN_epoch_0100"
+all_model_checkpoint_paths: "/home/ruben/.lab/2018-04-19_10-54_task_3a_dqnagent/run_00/models/DQN_epoch_0096"
+all_model_checkpoint_paths: "/home/ruben/.lab/2018-04-19_10-54_task_3a_dqnagent/run_00/models/DQN_epoch_0097"
+all_model_checkpoint_paths: "/home/ruben/.lab/2018-04-19_10-54_task_3a_dqnagent/run_00/models/DQN_epoch_0098"
+all_model_checkpoint_paths: "/home/ruben/.lab/2018-04-19_10-54_task_3a_dqnagent/run_00/models/DQN_epoch_0099"
+all_model_checkpoint_paths: "/home/ruben/.lab/2018-04-19_10-54_task_3a_dqnagent/run_00/models/DQN_epoch_0100"

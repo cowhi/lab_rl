@@ -49,7 +49,11 @@ class Agent(object):
         self.epsilon = self.args.epsilon_start
         self.tau = self.args.tau_start
         self.tau_diff = 0.0
-        self.loss = 0
+        self.loss = 0.0
+        
+        if self.args.agent in ['ADAAPT', 'DECAF']:
+            self.importance_loss = 0.0
+            self.episode_importance_losses = []
 
         self.step_penalty = self.args.step_penalty
         self.epoch = 0  # epoch counter
@@ -146,6 +150,8 @@ class Agent(object):
                      'batch_size',
                      'goal',
                      'goals_total')
+        if self.args.agent in ['ADAAPT', 'DECAF']:
+            first_row += ('importance_loss',)
         self.csv_train_file = open(
                 os.path.join(self.paths['log_path'], 'stats_train.csv'), "wb")
         self.csv_train_writer = csv.writer(self.csv_train_file)
@@ -205,6 +211,8 @@ class Agent(object):
         self.episode_losses = []
         self.env.reset()
         self.episode_start_time = time.time()
+        if self.args.agent in ['ADAAPT', 'DECAF']:
+            self.episode_importance_losses = []
 
     def episode_cleanup(self):
         # print('Episode', self.episode, 'END')
@@ -216,6 +224,11 @@ class Agent(object):
             self.loss = sum(self.episode_losses)/len(self.episode_losses)
         else:
             self.loss = 0.0
+        if self.args.agent in ['ADAAPT', 'DECAF']:
+            if not len(self.episode_importance_losses) == 0:
+                self.importance_loss = sum(self.episode_importance_losses)/len(self.episode_importance_losses)
+            else:
+                self.importance_loss = 0.0
         
         new_row = (self.episode,  # current episode
                    "{0:.1f}".format(time.time() - self.start_time),
@@ -233,6 +246,8 @@ class Agent(object):
                    self.goal_reached,  # 1 if goal was actually reached
                    self.total_goals_reached  # count of all goals reached so far
                    )
+        if self.args.agent in ['ADAAPT', 'DECAF']:
+            new_row += ("{0:.4f}".format(self.importance_loss),)  # avg importance loss per batch
         # print(new_row)
         # print('Train Episode', self.episode,
         #       '(steps:', self.step_current,')finished.
@@ -844,28 +859,36 @@ class ADAAPTAgent(Agent):
         #                                   self.model_name)
         #    self.saver.save(self.session, self.model_last)
 
-    def train_model(self, target):
+    def train_model(self):
         # train model with random batch from memory
-        # if self.step_current % int((1/5)*self.args.steps) == 0:
-        #    self.batch_size *= 2
-        # TODO: add dynamics (combine 4 observations to one state)
         if self.memory.size > 2 * self.batch_size:
-            s, a, r, s_prime, is_terminal = self.memory.get_batch()
-            # values from current policy
-            qs_policy
-            qs = self.get_weighted_qs(s)
-            # print('Qs', qs[0])
-            # TODO: values from target network!
-            # max_qs = np.max(self.model.get_qs(s_prime), axis=1)
-            max_qs = np.max(self.target_model.get_qs(s_prime), axis=1)
-            # print('a', a[0], 'r', r[0], 'gamma',
-            #       self.args.gamma, 'q_s_prime', max_qs[0])
-            qs[np.arange(qs.shape[0]), a] = r + (1 - is_terminal) * (
-                    self.args.gamma * max_qs)
-            # print('Qs_updated', qs[0])
-            # Training of current policy!
-            return self.model.train(s, qs)
-        return 0.0
+            s, a, r, s_prime, is_terminal = self.memory.get_batch() 
+            # Get Q_train(s')
+            # Get weights from importance network
+            w = self.target_importance_model.get_action_probs(s_prime)
+            # print(w, w.shape, w[0,3])
+            # Get all qs from source and policy
+            Q_train = self.target_model.get_qs(s_prime) * w[0,0]
+            for i in range(self.count_source_models):
+                Q_train += self.source_models["source_" + str(i+1)].get_qs(s) * w[0,i+1]
+            # calculate training signal r + gamma * max_a' Q_train(s')
+            signal = r + (1 - is_terminal) * (self.args.gamma * np.max(Q_train, axis=1))
+            # Get Q_omega
+            Q = self.model.get_qs(s)
+            # Update Q_omega with training signal
+            # Only update the Q value for chosen action so the loss 
+            # for the other actions becomes 0
+            Q[np.arange(Q.shape[0]), a] = signal
+            # Get W
+            W = self.importance_model.get_qs(s)
+            # TODO: Update W with training signal
+            W[np.arange(W.shape[0]), 0] = 1
+            # Train current policy!
+            self.episode_losses.append(self.model.train(s, Q))
+            # Train importance network
+            self.episode_importance_losses.append(self.importance_model.train(s, W))
+            return True
+        return False
     
     def get_weighted_qs(self, s):
         # Get importance vector from imporance network
@@ -890,21 +913,31 @@ class ADAAPTAgent(Agent):
         target_params = [t for t in tf.trainable_variables()
                          if t.name.startswith(target)]
         target_params = sorted(target_params, key=lambda v: v.name)
-
         update_ops = []
         for policy_v, target_v in zip(policy_params, target_params):
             op = target_v.assign(policy_v)
             update_ops.append(op)
-
         self.session.run(update_ops)
     
     def get_action(self, state):
         """ Returns an action selected through softmax. """
-        # TODO: Get output from importance network
-        # TODO: get all qs from source and policy
-        # TODO: Calculate weighted q values
-        # TODO: Perform argmax
-        # TODO: Get actions from model
+        if not self.run_test:
+            # Get weights from importance network
+            w = self.importance_model.get_action_probs(state)
+            #print(w, w.shape, w[0,3])
+            # Get all qs from source and policy
+            Q = self.model.get_qs(state) * w[0,0]
+            for i in range(self.count_source_models):
+                Q += self.source_models["source_" + str(i+1)].get_qs(state) * w[0,i+1]
+            #print(Q, Q.shape, Q[0,0])
+            return np.argmax(Q)
+        if self.rng.random_sample() < self.args.epsilon_min:
+            # select random action
+            return self.rng.choice(self.available_actions)
+        else:
+            # if not random choose action with highest Q-value
+            return np.argmax(self.model.get_qs(state))
+        """
         if self.exploration_method == "epsilon":
             if self.rng.random_sample() < self.epsilon:
                 # select random action
@@ -917,7 +950,8 @@ class ADAAPTAgent(Agent):
             return self.rng.choice(self.available_actions,
                                    p=get_softmax(self.model.get_qs(state),
                                                  self.tau))
-
+        """
+        
     def train(self):
         self.epoch_cleanup()
         self.epoch_reset()
@@ -937,7 +971,8 @@ class ADAAPTAgent(Agent):
             s, a, r, is_terminal = self.step()
             self.episode_reward += r
             self.memory.add(s, a, r, is_terminal)
-            self.episode_losses.append(self.train_model())
+            self.train_model()
+            #self.episode_losses.append(self.train_model())
             # End episode if necessary
             if not self.env.is_running() or \
                     is_terminal or \

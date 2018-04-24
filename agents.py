@@ -64,6 +64,7 @@ class Agent(object):
         self.test_reward_best = 0  # best avg reward after epochs
         self.goal_reached = 0  # only 1 if goal is reached in an episode
         self.total_goals_reached = 0  # all goals reached during training
+        self.run_test = False
 
         # Prepare training logs (written after every episode)
         self.csv_train_file = None
@@ -610,7 +611,8 @@ class DQNAgent(Agent):
         
         self.saver = tf.train.Saver(
                 var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES,
-                                           scope='policy'))
+                                           scope='policy'),
+                max_to_keep=1000)
         if self.args.load_model is not None:
             self.saver.restore(self.session, self.args.load_model)
             self.model_name = self.args.load_model.split("/")[-1]
@@ -794,15 +796,20 @@ class ADAAPTAgent(Agent):
         
         self.saver = tf.train.Saver(
                 var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES,
-                                           scope='policy'))
+                                           scope='policy'),
+                max_to_keep=1000)
         
-        self.args.load_source1 = '/home/ruben/.lab/2018-04-16_14-13_task_3a_adaapt/run_00/models/DQN_epoch_0000'
-        self.args.load_source2 = '/home/ruben/.lab/2018-04-16_14-13_task_3a_adaapt/run_00/models/DQN_epoch_0001'
-        self.args.load_source3 = '/home/ruben/.lab/2018-04-16_14-13_task_3a_adaapt/run_00/models/DQN_epoch_0002'
+        self.args.load_source1 = '/home/ruben/playground/lab/lab_rl/DECAF/2018-04-21_21-24_task_2a_dqnagent/run_00/models/DQN_epoch_0100'
+        self.args.load_source2 = '/home/ruben/playground/lab/lab_rl/DECAF/2018-04-20_15-24_task_4a_dqnagent/run_00/models/DQN_epoch_0100'
+        #self.args.load_source3 = '/home/ruben/.lab/2018-04-16_14-13_task_3a_adaapt/run_00/models/DQN_epoch_0002'
         # Load source models first if available
         self.count_source_models = 0
         self.source_models = {}
-        sources = [self.args.load_source1, self.args.load_source2, self.args.load_source3]
+        sources = [
+            self.args.load_source1, 
+            self.args.load_source2  #, 
+            # self.args.load_source3
+        ]
         for source in sources:
             if source is not None:
                 self.count_source_models += 1
@@ -866,7 +873,6 @@ class ADAAPTAgent(Agent):
             # Get Q_train(s')
             # Get weights from importance network
             w = self.target_importance_model.get_action_probs(s_prime)
-            # print(w, w.shape, w[0,3])
             # Get all qs from source and policy
             Q_train = self.target_model.get_qs(s_prime) * w[0,0]
             for i in range(self.count_source_models):
@@ -879,10 +885,9 @@ class ADAAPTAgent(Agent):
             # Only update the Q value for chosen action so the loss 
             # for the other actions becomes 0
             Q[np.arange(Q.shape[0]), a] = signal
-            # Get W
-            W = self.importance_model.get_qs(s)
-            # TODO: Update W with training signal
-            W[np.arange(W.shape[0]), 0] = 1
+            # Update W with training signal
+            W = np.zeros_like(w)
+            W[np.arange(W.shape[0]), 0] = signal
             # Train current policy!
             self.episode_losses.append(self.model.train(s, Q))
             # Train importance network
@@ -987,7 +992,12 @@ class ADAAPTAgent(Agent):
                 self.episode_reset()
             # Copy network weights from time to time
             if self.step_current % self.args.target_update_frequency == 0:
-                self.copy_model_parameters(self.model.scope, self.target_model.scope)
+                self.copy_model_parameters(
+                    self.model.scope, 
+                    self.target_model.scope)
+                self.copy_model_parameters(
+                    self.importance_model.scope, 
+                    self.target_importance_model.scope)
             # End epoch if necessary
             if self.step_current % \
                     (self.args.backup_frequency * self.args.steps) == 0 or \

@@ -54,6 +54,9 @@ class Agent(object):
         if self.args.agent in ['ADAAPT', 'DECAF']:
             self.importance_loss = 0.0
             self.episode_importance_losses = []
+            self.episode_w0 = []
+            self.episode_w1 = []
+            self.episode_w2 = []
 
         self.step_penalty = self.args.step_penalty
         self.epoch = 0  # epoch counter
@@ -153,6 +156,9 @@ class Agent(object):
                      'goals_total')
         if self.args.agent in ['ADAAPT', 'DECAF']:
             first_row += ('importance_loss',)
+            first_row += ('w0',)
+            first_row += ('w1',)
+            first_row += ('w2',)
         self.csv_train_file = open(
                 os.path.join(self.paths['log_path'], 'stats_train.csv'), "wb")
         self.csv_train_writer = csv.writer(self.csv_train_file)
@@ -214,6 +220,9 @@ class Agent(object):
         self.episode_start_time = time.time()
         if self.args.agent in ['ADAAPT', 'DECAF']:
             self.episode_importance_losses = []
+            self.episode_w0 =[]
+            self.episode_w1 =[]
+            self.episode_w2 =[]
 
     def episode_cleanup(self):
         # print('Episode', self.episode, 'END')
@@ -226,10 +235,24 @@ class Agent(object):
         else:
             self.loss = 0.0
         if self.args.agent in ['ADAAPT', 'DECAF']:
-            if not len(self.episode_importance_losses) == 0:
-                self.importance_loss = sum(self.episode_importance_losses)/len(self.episode_importance_losses)
-            else:
-                self.importance_loss = 0.0
+            #if not len(self.episode_importance_losses) == 0:   
+            self.importance_loss = \
+                sum(self.episode_importance_losses)/len(self.episode_importance_losses) \
+                if not len(self.episode_importance_losses) == 0 else 0.0
+            #else:
+            #    self.importance_loss = 0.0
+            #if not len(self.episode_w0) == 0:
+            self.w0 = \
+                sum(self.episode_w0)/len(self.episode_w0) \
+                if not len(self.episode_w0) == 0 else 0.0
+            #else:
+            #    self.w0 = 0.0
+            self.w1 = \
+                sum(self.episode_w1)/len(self.episode_w1) \
+                if not len(self.episode_w1) == 0 else 0.0
+            self.w2 = \
+                sum(self.episode_w2)/len(self.episode_w2) \
+                if not len(self.episode_w2) == 0 else 0.0
         
         new_row = (self.episode,  # current episode
                    "{0:.1f}".format(time.time() - self.start_time),
@@ -249,6 +272,9 @@ class Agent(object):
                    )
         if self.args.agent in ['ADAAPT', 'DECAF']:
             new_row += ("{0:.4f}".format(self.importance_loss),)  # avg importance loss per batch
+            new_row += ("{0:.4f}".format(self.w0),)  # avg policy weight
+            new_row += ("{0:.4f}".format(self.w1),)  # avg policy weight
+            new_row += ("{0:.4f}".format(self.w2),)  # avg policy weight
         # print(new_row)
         # print('Train Episode', self.episode,
         #       '(steps:', self.step_current,')finished.
@@ -856,6 +882,14 @@ class ADAAPTAgent(Agent):
             # print('############################################################')
             init = tf.global_variables_initializer()
             self.session.run(init)
+            
+            
+            # TODO: Set w too all equal values that init output is equal
+            # params_list = [t for t in tf.trainable_variables()
+            #             if t.name.startswith('importance')]
+            # init = tf.variables_initializer(params_list)
+            
+            
         # We want to have two similar networks
         self.copy_model_parameters(self.model.scope, self.target_model.scope)
         self.copy_model_parameters(self.importance_model.scope, self.target_importance_model.scope)
@@ -886,8 +920,11 @@ class ADAAPTAgent(Agent):
             # for the other actions becomes 0
             Q[np.arange(Q.shape[0]), a] = signal
             # Update W with training signal
-            W = np.zeros_like(w)
-            W[np.arange(W.shape[0]), 0] = signal
+            #W = np.zeros_like(w)
+            W = self.importance_model.get_qs(s)
+            W[np.arange(W.shape[0]), 0] = signal * w[0,0]
+            for i in range(self.count_source_models):
+                W[np.arange(W.shape[0]), i] = signal * w[0,i+1]
             # Train current policy!
             self.episode_losses.append(self.model.train(s, Q))
             # Train importance network
@@ -895,6 +932,7 @@ class ADAAPTAgent(Agent):
             return True
         return False
     
+    '''
     def get_weighted_qs(self, s):
         # Get importance vector from imporance network
         importance = self.importance_model.get_action_probs(s)
@@ -907,6 +945,7 @@ class ADAAPTAgent(Agent):
         # TODO: Calculate weighted Q values
         weighted_qs = qs
         return weighted_qs
+    '''
 
     def copy_model_parameters(self, source, target):
         """ Copies the trainable network parameters from the
@@ -929,6 +968,9 @@ class ADAAPTAgent(Agent):
         if not self.run_test:
             # Get weights from importance network
             w = self.importance_model.get_action_probs(state)
+            self.episode_w0.append(w[0,0])
+            self.episode_w1.append(w[0,1])
+            self.episode_w2.append(w[0,2])
             #print(w, w.shape, w[0,3])
             # Get all qs from source and policy
             Q = self.model.get_qs(state) * w[0,0]

@@ -42,6 +42,7 @@ class Agent(object):
         self.env = env
         self.paths = paths
         self.episode_reward = 0.0
+        self.episode_discounted_reward = 0.0
         self.episode_losses = []
         self.epoch_rewards = []
         self.episode_max_Qs = []
@@ -147,6 +148,7 @@ class Agent(object):
                      'duration',
                      'steps',
                      'reward',
+                     'discounted_reward',
                      'steps_total',
                      'reward_total',
                      'tau',
@@ -214,7 +216,8 @@ class Agent(object):
     def episode_reset(self):
         self.episode += 1
         # print('Episode', self.episode, 'START')
-        self.episode_reward = 0
+        self.episode_reward = 0.0
+        self.episode_discounted_reward = 0.0
         self.step_episode = 0
         self.goal_reached = 0
         self.episode_losses = []
@@ -266,6 +269,7 @@ class Agent(object):
                    # episode duration
                    self.step_episode,  # steps per episode
                    self.episode_reward,  # reward per episode
+                   self.episode_discounted_reward,  # discounted reward per episode
                    self.step_current,  # total steps so far
                    self.total_reward,  # total reward so far
                    "{0:.4f}".format(self.tau),  # current tau
@@ -741,6 +745,7 @@ class DQNAgent(Agent):
             self.epsilon = self.epsilons[self.step_current-1]
             s, a, r, is_terminal = self.step()
             self.episode_reward += r
+            self.episode_discounted_reward += r * (self.args.gamma**self.step_episode)
             self.memory.add(s, a, r, is_terminal)
             self.episode_losses.append(self.train_model())
             # End episode if necessary
@@ -1033,6 +1038,7 @@ class ADAAPTAgent(Agent):
             self.epsilon = self.epsilons[self.step_current-1]
             s, a, r, is_terminal = self.step()
             self.episode_reward += r
+            self.episode_discounted_reward += r * (self.args.gamma**self.step_episode)
             self.memory.add(s, a, r, is_terminal)
             self.train_model()
             #self.episode_losses.append(self.train_model())

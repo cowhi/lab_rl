@@ -44,6 +44,7 @@ class Agent(object):
         self.episode_reward = 0.0
         self.episode_losses = []
         self.epoch_rewards = []
+        self.episode_max_Qs = []
         self.available_actions = self.env.count_actions()
         self.exploration_method = self.args.exploration_method
         self.epsilon = self.args.epsilon_start
@@ -153,7 +154,8 @@ class Agent(object):
                      'loss',
                      'batch_size',
                      'goal',
-                     'goals_total')
+                     'goals_total',
+                     'max_Q')
         if self.args.agent in ['ADAAPT', 'DECAF']:
             first_row += ('importance_loss',)
             first_row += ('w0',)
@@ -216,6 +218,7 @@ class Agent(object):
         self.step_episode = 0
         self.goal_reached = 0
         self.episode_losses = []
+        self.episode_max_Qs = []
         self.env.reset()
         self.episode_start_time = time.time()
         if self.args.agent in ['ADAAPT', 'DECAF']:
@@ -230,10 +233,12 @@ class Agent(object):
         self.total_reward += self.episode_reward
         self.total_goals_reached += self.goal_reached
         # TODO: Figure out why len(self.episode_losses) is sometimes 0 
-        if not len(self.episode_losses) == 0:
-            self.loss = sum(self.episode_losses)/len(self.episode_losses)
-        else:
-            self.loss = 0.0
+        self.loss = \
+            sum(self.episode_losses)/len(self.episode_losses) \
+            if not len(self.episode_losses) == 0 else 0.0
+        self.max_Q = \
+            sum(self.episode_max_Qs)/len(self.episode_max_Qs) \
+            if not len(self.episode_max_Qs) == 0 else 0.0
         if self.args.agent in ['ADAAPT', 'DECAF']:
             #if not len(self.episode_importance_losses) == 0:   
             self.importance_loss = \
@@ -268,7 +273,8 @@ class Agent(object):
                    "{0:.4f}".format(self.loss),  # avg loss per batch
                    self.batch_size,  # current batch size used for training
                    self.goal_reached,  # 1 if goal was actually reached
-                   self.total_goals_reached  # count of all goals reached so far
+                   self.total_goals_reached,  # count of all goals reached so far
+                   "{0:.4f}".format(self.max_Q)
                    )
         if self.args.agent in ['ADAAPT', 'DECAF']:
             new_row += ("{0:.4f}".format(self.importance_loss),)  # avg importance loss per batch
@@ -294,6 +300,7 @@ class Agent(object):
                         self.args.steps,
                         self.epoch_rewards,
                         time.time() - self.start_time)
+        
         test_reward, test_steps, test_goals = self.test(self.args.test_episodes)
 
         new_row = (self.epoch,  # current epoch
@@ -701,17 +708,19 @@ class DQNAgent(Agent):
     def get_action(self, state):
         """ Returns an action selected through softmax. """
         # TODO: Get actions from model
+        Q_target = self.model.get_qs(state)
+        self.episode_max_Qs.append(np.max(Q_target))
         if self.exploration_method == "epsilon":
             if self.rng.random_sample() < self.epsilon:
                 # select random action
                 return self.rng.choice(self.available_actions)
             else:
                 # if not random choose action with highest Q-value
-                return np.argmax(self.model.get_qs(state)) 
+                return np.argmax(Q_target) 
         if self.exploration_method == "tau":
             # print(self.step_current, self.tau, self.batch_size)
             return self.rng.choice(self.available_actions,
-                                   p=get_softmax(self.model.get_qs(state),
+                                   p=get_softmax(Q_target,
                                                  self.tau))
 
     def train(self):
@@ -964,7 +973,9 @@ class ADAAPTAgent(Agent):
         self.session.run(update_ops)
     
     def get_action(self, state):
-        """ Returns an action selected through softmax. """
+        """ Returns an action. """
+        Q_target = self.model.get_qs(state)
+        # While Training
         if not self.run_test:
             # Get weights from importance network
             w = self.importance_model.get_action_probs(state)
@@ -973,17 +984,19 @@ class ADAAPTAgent(Agent):
             self.episode_w2.append(w[0,2])
             #print(w, w.shape, w[0,3])
             # Get all qs from source and policy
-            Q = self.model.get_qs(state) * w[0,0]
+            Q = Q_target * w[0,0]
             for i in range(self.count_source_models):
                 Q += self.source_models["source_" + str(i+1)].get_qs(state) * w[0,i+1]
             #print(Q, Q.shape, Q[0,0])
             return np.argmax(Q)
+        # While Testing
+        self.episode_max_Qs.append(np.max(Q_target))
         if self.rng.random_sample() < self.args.epsilon_min:
             # select random action
             return self.rng.choice(self.available_actions)
         else:
             # if not random choose action with highest Q-value
-            return np.argmax(self.model.get_qs(state))
+            return np.argmax(Q_target)
         """
         if self.exploration_method == "epsilon":
             if self.rng.random_sample() < self.epsilon:
@@ -1000,11 +1013,14 @@ class ADAAPTAgent(Agent):
         """
         
     def train(self):
+        self.run_test = True
+        print('run_test (before start)', self.run_test)
         self.epoch_cleanup()
         self.epoch_reset()
         print("TRAINING")
         self.episode_reset()
         self.run_test = False
+        print('run_test (before train)', self.run_test)
         for self.step_current in range(1, self.args.steps+1):
             self.step_episode += 1
             # self.tau = self.update_tau()
@@ -1029,6 +1045,7 @@ class ADAAPTAgent(Agent):
                     self.epoch_cleanup()
                     self.epoch_reset()
                     self.run_test = False
+                    print('run_test (after test)', self.run_test)
                     if not self.step_current == self.args.steps:
                         print("TRAINING")
                 self.episode_reset()
@@ -1045,4 +1062,5 @@ class ADAAPTAgent(Agent):
                     (self.args.backup_frequency * self.args.steps) == 0 or \
                     self.step_current == self.args.steps - 1:
                 self.run_test = True
+                print('run_test (before test)', self.run_test)
         self.session.close()

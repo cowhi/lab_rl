@@ -10,12 +10,12 @@ local map = {}
 --[[
     Description of entity objects:
     * --> wall
-    A --> apple +1
+    A --> apple +2
     F --> fungi -2
-    G --> goal +10
+    G --> goal +3
     H --> horizontal door
     I --> vertical door
-    L --> lemon -1
+    L --> lemon -2
     P --> player
     S --> strawberry +2
 --]]
